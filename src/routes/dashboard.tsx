@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { listChecklistsStore as listChecklists, type Checklist } from "@/lib/store";
 import { getSession, clearSession } from "@/lib/session";
 import { Upload, ClipboardList, CheckCircle2, LogOut, Clock } from "lucide-react";
-import { InstallAppButton } from "@/components/InstallAppButton";
 
 export const Route = createFileRoute("/dashboard")({
   component: Dashboard,
@@ -48,7 +47,6 @@ function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <InstallAppButton />
             <button
               onClick={() => {
                 clearSession();

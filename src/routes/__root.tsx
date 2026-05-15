@@ -10,6 +10,7 @@ import {
 import { useEffect } from "react";
 import { Toaster } from "sonner";
 import { initAnalytics } from "@/lib/firebase";
+import { InstallAppButton } from "@/components/InstallAppButton";
 
 import appCss from "../styles.css?url";
 
@@ -122,6 +123,9 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
+      <div className="fixed bottom-5 right-5 z-50">
+        <InstallAppButton />
+      </div>
       <Toaster richColors position="top-center" />
     </QueryClientProvider>
   );
