@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+﻿import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
   createRootRouteWithContext,
@@ -19,12 +19,12 @@ function NotFoundComponent() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Página não encontrada.</p>
+        <p className="mt-2 text-sm text-muted-foreground">PÃ¡gina nÃ£o encontrada.</p>
         <Link
           to="/"
           className="mt-6 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
         >
-          Início
+          InÃ­cio
         </Link>
       </div>
     </div>
@@ -58,25 +58,25 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { title: "Prudêncio Checklist — Guias de Transporte" },
+      { title: "PrudÃªncio Checklist â€” Guias de Transporte" },
       {
         name: "description",
-        content: "PWA para automação de Guias de Transporte: PDF → Checklist → WhatsApp → Mobile.",
+        content: "PWA para automaÃ§Ã£o de Guias de Transporte: PDF â†’ Checklist â†’ WhatsApp â†’ Mobile.",
       },
       { name: "theme-color", content: "#0a2540" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
-      { name: "apple-mobile-web-app-title", content: "Prudêncio" },
-      { property: "og:title", content: "Prudêncio Checklist — Guias de Transporte" },
+      { name: "apple-mobile-web-app-title", content: "PrudÃªncio" },
+      { property: "og:title", content: "PrudÃªncio Checklist â€” Guias de Transporte" },
       {
         property: "og:description",
-        content: "PWA para automação de Guias de Transporte: PDF → Checklist → WhatsApp → Mobile.",
+        content: "PWA para automaÃ§Ã£o de Guias de Transporte: PDF â†’ Checklist â†’ WhatsApp â†’ Mobile.",
       },
       { property: "og:type", content: "website" },
-      { name: "twitter:title", content: "Prudêncio Checklist — Guias de Transporte" },
+      { name: "twitter:title", content: "PrudÃªncio Checklist â€” Guias de Transporte" },
       {
         name: "twitter:description",
-        content: "PWA para automação de Guias de Transporte: PDF → Checklist → WhatsApp → Mobile.",
+        content: "PWA para automaÃ§Ã£o de Guias de Transporte: PDF â†’ Checklist â†’ WhatsApp â†’ Mobile.",
       },
       { name: "twitter:card", content: "summary" },
       { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/edd4210b-188a-4153-8e81-ca6d5fba171d/id-preview-432c1843--10f8940c-ad82-4bcd-8804-996d73a935eb.lovable.app-1778804025924.png" },
@@ -113,6 +113,27 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   useEffect(() => {
     initAnalytics();
+    // Force hide Lovable badge if it gets injected
+    if (typeof window !== "undefined") {
+      const hideBadge = () => {
+        document.querySelectorAll('div, iframe, a').forEach(el => {
+          if (
+            (el.id && el.id.toLowerCase().includes('lovable')) ||
+            (el.className && typeof el.className === 'string' && el.className.toLowerCase().includes('lovable')) ||
+            (el.src && el.src.includes('lovable')) ||
+            (el.textContent && el.textContent.includes('Edit with') && el.textContent.includes('Lovable'))
+          ) {
+            el.style.setProperty('display', 'none', 'important');
+            el.style.setProperty('opacity', '0', 'important');
+            el.style.setProperty('z-index', '-9999', 'important');
+            el.style.setProperty('pointer-events', 'none', 'important');
+          }
+        });
+      };
+      
+      hideBadge();
+      setInterval(hideBadge, 500); // Check aggressively every 500ms
+    }
     // Register PWA service worker
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch((err) => {
@@ -130,3 +151,4 @@ function RootComponent() {
     </QueryClientProvider>
   );
 }
+
