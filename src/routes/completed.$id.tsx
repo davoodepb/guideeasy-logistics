@@ -47,7 +47,16 @@ function CompletedPage() {
   function shareWhatsApp() {
     if (!c) return;
     const url = `${window.location.origin}/completed/${id}`;
-    const text = `✅ Checklist *${c.numero_guia || c.codigo_at}* concluída por ${c.responsavel}.\n${url}`;
+    const lines = c.items
+      .map((i) => `• ${i.artigo} | ${i.quantidade} ${i.unidade} | ${i.descricao}`)
+      .join("\n");
+    const text =
+      `✅ *Checklist concluída*\n\n` +
+      `Data: ${c.data_documento || ""}\n` +
+      `Chave AT: ${c.codigo_at || ""}\n` +
+      `Responsável: ${c.responsavel || ""}\n\n` +
+      `Artigos:\n${lines}\n\n` +
+      `Abrir: ${url}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
   }
 
@@ -55,7 +64,7 @@ function CompletedPage() {
     if (!c) return;
     const headers = ["Artigo", "Descrição", "Quantidade", "Unidade", "Confirmado"];
     const rows = c.items.map((i) =>
-      [i.artigo, `"${i.descricao}"`, i.quantidade, i.unidade, i.checked ? "Sim" : "Não"].join(";")
+      [i.artigo, `"${i.descricao}"`, i.quantidade, i.unidade, i.checked ? "Sim" : "Não"].join(";"),
     );
     const csv = [headers.join(";"), ...rows].join("\n");
     const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
@@ -88,14 +97,22 @@ function CompletedPage() {
       <section className="px-5 mt-5 space-y-4">
         {/* Summary Card */}
         <div className="bg-card rounded-2xl border p-4 grid grid-cols-2 gap-3 text-sm">
-          <Field icon={<User className="size-4" />} label="Responsável" value={c.responsavel || "—"} />
+          <Field
+            icon={<User className="size-4" />}
+            label="Responsável"
+            value={c.responsavel || "—"}
+          />
           <Field
             icon={<Calendar className="size-4" />}
             label="Submetida"
             value={c.submitted_at ? new Date(c.submitted_at).toLocaleString("pt-PT") : "—"}
           />
           <Field icon={<Hash className="size-4" />} label="Código AT" value={c.codigo_at || "—"} />
-          <Field icon={<FileText className="size-4" />} label="Nº Guia" value={c.numero_guia || "—"} />
+          <Field
+            icon={<FileText className="size-4" />}
+            label="Nº Guia"
+            value={c.numero_guia || "—"}
+          />
           <Field
             icon={<CheckCircle2 className="size-4" />}
             label="Confirmados"
@@ -109,7 +126,9 @@ function CompletedPage() {
         </div>
 
         {/* Observações */}
-        {c.observacoes_renato && <Block title="Observações do Renato" body={c.observacoes_renato} accent />}
+        {c.observacoes_renato && (
+          <Block title="Observações do Renato" body={c.observacoes_renato} accent />
+        )}
         {c.observacoes_colaborador && (
           <Block title="Observações do Colaborador" body={c.observacoes_colaborador} />
         )}
@@ -170,15 +189,7 @@ function CompletedPage() {
   );
 }
 
-function Field({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-}) {
+function Field({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <div className="flex items-start gap-2">
       <span className="text-muted-foreground mt-0.5 shrink-0">{icon}</span>
@@ -193,9 +204,7 @@ function Field({
 function Block({ title, body, accent }: { title: string; body: string; accent?: boolean }) {
   return (
     <div
-      className={`bg-card rounded-2xl border p-4 ${
-        accent ? "border-l-4 border-l-secondary" : ""
-      }`}
+      className={`bg-card rounded-2xl border p-4 ${accent ? "border-l-4 border-l-secondary" : ""}`}
     >
       <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">{title}</p>
       <p className="text-sm whitespace-pre-wrap">{body}</p>

@@ -63,18 +63,19 @@ function LoginPage() {
           <div className="flex flex-col items-center text-center mb-8 text-primary-foreground">
             {/* Prudêncio Logo */}
             <div className="mb-2">
-              <img
-                src="/icon-512.png"
-                alt="Prudêncio"
-                className="size-20 rounded-2xl shadow-xl"
-              />
+              <img src="/icon-512.png" alt="Prudêncio" className="size-20 rounded-2xl shadow-xl" />
             </div>
             <h1 className="mt-3 text-2xl font-bold tracking-tight">Prudêncio</h1>
             <p className="text-xs text-primary-foreground/60 mt-0.5">Impermeabilizações</p>
-            <p className="text-sm text-primary-foreground/70 mt-2">Guias de Transporte → Checklist</p>
+            <p className="text-sm text-primary-foreground/70 mt-2">
+              Guias de Transporte → Checklist
+            </p>
           </div>
 
-          <form onSubmit={handle} className="bg-card text-card-foreground rounded-2xl p-6 shadow-2xl space-y-4">
+          <form
+            onSubmit={handle}
+            className="bg-card text-card-foreground rounded-2xl p-6 shadow-2xl space-y-4"
+          >
             <div>
               <label className="text-sm font-medium">Nome</label>
               <input
@@ -100,7 +101,9 @@ function LoginPage() {
             >
               {busy ? "A entrar..." : "Entrar"}
             </button>
-            <p className="text-xs text-muted-foreground text-center">A sessão fica guardada no dispositivo.</p>
+            <p className="text-xs text-muted-foreground text-center">
+              A sessão fica guardada no dispositivo.
+            </p>
           </form>
 
           {/* PWA Install Button */}

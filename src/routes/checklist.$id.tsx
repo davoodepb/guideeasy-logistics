@@ -1,9 +1,14 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { getChecklistStore as getChecklist, updateChecklistStore as updateChecklist, type Checklist } from "@/lib/store";
+import {
+  getChecklistStore as getChecklist,
+  updateChecklistStore as updateChecklist,
+  type Checklist,
+} from "@/lib/store";
+import { exportChecklistToExcel } from "@/lib/excel-export";
 import { getSession } from "@/lib/session";
 import { toast } from "sonner";
-import { ArrowLeft, Send, MessageCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, Send, MessageCircle, Loader2, Download } from "lucide-react";
 
 export const Route = createFileRoute("/checklist/$id")({
   component: ChecklistPage,
@@ -43,8 +48,17 @@ function ChecklistPage() {
   }
 
   function shareWhatsApp() {
+    if (!c) return;
     const url = `${window.location.origin}/checklist/${id}`;
-    const msg = `📋 *Checklist Prudêncio*\n\nCódigo AT: ${c?.codigo_at}\nArtigos: ${c?.items.length}\n\nAbrir: ${url}`;
+    const lines = c.items
+      .map((i) => `• ${i.artigo} | ${i.quantidade} ${i.unidade} | ${i.descricao}`)
+      .join("\n");
+    const msg =
+      `📋 *Checklist Prudêncio*\n\n` +
+      `Data: ${c.data_documento || ""}\n` +
+      `Chave AT: ${c.codigo_at || ""}\n\n` +
+      `Artigos:\n${lines}\n\n` +
+      `Abrir: ${url}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
   }
 
@@ -93,18 +107,40 @@ function ChecklistPage() {
             <h1 className="text-xl font-bold">Checklist</h1>
             <p className="text-sm opacity-80 font-mono">{c.codigo_at}</p>
           </div>
-          <button
-            onClick={shareWhatsApp}
-            className="size-11 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center shadow"
-            aria-label="Enviar por WhatsApp"
-          >
-            <MessageCircle className="size-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => exportChecklistToExcel(c)}
+              className="size-11 rounded-full bg-secondary/70 text-secondary-foreground flex items-center justify-center shadow"
+              aria-label="Baixar Excel"
+              title="Baixar Excel"
+            >
+              <Download className="size-5" />
+            </button>
+            <button
+              onClick={shareWhatsApp}
+              className="size-11 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center shadow"
+              aria-label="Enviar por WhatsApp"
+            >
+              <MessageCircle className="size-5" />
+            </button>
+          </div>
         </div>
         <p className="mt-3 text-sm">
-          Progresso: <span className="font-bold">{done}/{c.items.length}</span>
+          Progresso:{" "}
+          <span className="font-bold">
+            {done}/{c.items.length}
+          </span>
         </p>
       </header>
+
+      <section className="px-5 mt-4">
+        <button
+          onClick={() => exportChecklistToExcel(c)}
+          className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2"
+        >
+          <Download className="size-4" /> ⬇️ Baixar Excel
+        </button>
+      </section>
 
       {c.observacoes_renato && (
         <section className="px-5 mt-4">
@@ -128,11 +164,19 @@ function ChecklistPage() {
           >
             <div
               className={`size-7 rounded-md border-2 flex items-center justify-center shrink-0 ${
-                it.checked ? "bg-secondary border-secondary text-secondary-foreground" : "border-input"
+                it.checked
+                  ? "bg-secondary border-secondary text-secondary-foreground"
+                  : "border-input"
               }`}
             >
               {it.checked && (
-                <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="3">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="size-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                >
                   <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               )}
@@ -150,7 +194,9 @@ function ChecklistPage() {
 
       <section className="px-5 mt-6 space-y-3">
         <div>
-          <label className="text-xs uppercase tracking-wider text-muted-foreground">Responsável</label>
+          <label className="text-xs uppercase tracking-wider text-muted-foreground">
+            Responsável
+          </label>
           <input
             value={resp}
             onChange={(e) => setResp(e.target.value)}

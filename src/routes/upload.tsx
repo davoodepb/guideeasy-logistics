@@ -178,11 +178,15 @@ function UploadPage() {
             <div className="bg-card rounded-2xl border p-4 space-y-3">
               <div className="flex items-center gap-2 mb-2">
                 <FileCheck className="size-5 text-primary" />
-                <h2 className="font-bold text-sm uppercase tracking-wider">Informação do Documento</h2>
+                <h2 className="font-bold text-sm uppercase tracking-wider">
+                  Informação do Documento
+                </h2>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
-                  <label className="text-xs uppercase tracking-wider text-muted-foreground">Chave AT</label>
+                  <label className="text-xs uppercase tracking-wider text-muted-foreground">
+                    Chave AT
+                  </label>
                   <input
                     value={chave}
                     onChange={(e) => setChave(e.target.value)}
@@ -190,7 +194,9 @@ function UploadPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs uppercase tracking-wider text-muted-foreground">Nº Guia</label>
+                  <label className="text-xs uppercase tracking-wider text-muted-foreground">
+                    Nº Guia
+                  </label>
                   <input
                     value={numeroGuia}
                     onChange={(e) => setNumeroGuia(e.target.value)}
@@ -198,7 +204,9 @@ function UploadPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs uppercase tracking-wider text-muted-foreground">ATCUD</label>
+                  <label className="text-xs uppercase tracking-wider text-muted-foreground">
+                    ATCUD
+                  </label>
                   <input
                     value={extracted.atcud}
                     readOnly
@@ -206,7 +214,9 @@ function UploadPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs uppercase tracking-wider text-muted-foreground">Data Documento</label>
+                  <label className="text-xs uppercase tracking-wider text-muted-foreground">
+                    Data Documento
+                  </label>
                   <input
                     type="date"
                     value={dataDoc}
@@ -215,7 +225,9 @@ function UploadPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs uppercase tracking-wider text-muted-foreground">V/N.º Contrib.</label>
+                  <label className="text-xs uppercase tracking-wider text-muted-foreground">
+                    V/N.º Contrib.
+                  </label>
                   <input
                     value={extracted.vn_contrib}
                     readOnly
@@ -223,7 +235,9 @@ function UploadPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs uppercase tracking-wider text-muted-foreground">Tipo</label>
+                  <label className="text-xs uppercase tracking-wider text-muted-foreground">
+                    Tipo
+                  </label>
                   <input
                     value={extracted.tipo_documento}
                     readOnly
@@ -244,16 +258,40 @@ function UploadPage() {
                 <span className="flex-1 font-bold text-sm uppercase tracking-wider">
                   Dados do Emissor (Remetente)
                 </span>
-                {showEmissor ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+                {showEmissor ? (
+                  <ChevronUp className="size-4" />
+                ) : (
+                  <ChevronDown className="size-4" />
+                )}
               </button>
               {showEmissor && (
                 <div className="px-4 pb-4 space-y-2 text-sm border-t pt-3">
-                  <InfoRow icon={<Building2 className="size-4" />} label="Empresa" value={extracted.emissor.empresa} />
-                  <InfoRow icon={<Hash className="size-4" />} label="Contribuinte" value={extracted.emissor.contribuinte} />
-                  <InfoRow icon={<MapPin className="size-4" />} label="Morada" value={extracted.emissor.morada} />
-                  <InfoRow icon={<User className="size-4" />} label="Contactos" value={extracted.emissor.contactos} />
+                  <InfoRow
+                    icon={<Building2 className="size-4" />}
+                    label="Empresa"
+                    value={extracted.emissor.empresa}
+                  />
+                  <InfoRow
+                    icon={<Hash className="size-4" />}
+                    label="Contribuinte"
+                    value={extracted.emissor.contribuinte}
+                  />
+                  <InfoRow
+                    icon={<MapPin className="size-4" />}
+                    label="Morada"
+                    value={extracted.emissor.morada}
+                  />
+                  <InfoRow
+                    icon={<User className="size-4" />}
+                    label="Contactos"
+                    value={extracted.emissor.contactos}
+                  />
                   {extracted.emissor.capital_social && (
-                    <InfoRow icon={<Hash className="size-4" />} label="Capital Social" value={extracted.emissor.capital_social} />
+                    <InfoRow
+                      icon={<Hash className="size-4" />}
+                      label="Capital Social"
+                      value={extracted.emissor.capital_social}
+                    />
                   )}
                 </div>
               )}
@@ -270,12 +308,24 @@ function UploadPage() {
                 <span className="flex-1 font-bold text-sm uppercase tracking-wider">
                   Dados do Destinatário (Cliente)
                 </span>
-                {showDestinatario ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+                {showDestinatario ? (
+                  <ChevronUp className="size-4" />
+                ) : (
+                  <ChevronDown className="size-4" />
+                )}
               </button>
               {showDestinatario && (
                 <div className="px-4 pb-4 space-y-2 text-sm border-t pt-3">
-                  <InfoRow icon={<User className="size-4" />} label="Nome" value={extracted.destinatario.nome} />
-                  <InfoRow icon={<MapPin className="size-4" />} label="Morada" value={extracted.destinatario.morada} />
+                  <InfoRow
+                    icon={<User className="size-4" />}
+                    label="Nome"
+                    value={extracted.destinatario.nome}
+                  />
+                  <InfoRow
+                    icon={<MapPin className="size-4" />}
+                    label="Morada"
+                    value={extracted.destinatario.morada}
+                  />
                 </div>
               )}
             </div>
@@ -291,13 +341,19 @@ function UploadPage() {
                 <span className="flex-1 font-bold text-sm uppercase tracking-wider">
                   Dados de Transporte
                 </span>
-                {showTransporte ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+                {showTransporte ? (
+                  <ChevronUp className="size-4" />
+                ) : (
+                  <ChevronDown className="size-4" />
+                )}
               </button>
               {showTransporte && (
                 <div className="px-4 pb-4 space-y-2 text-sm border-t pt-3">
                   <div className="grid grid-cols-2 gap-3 mb-2">
                     <div>
-                      <label className="text-xs uppercase tracking-wider text-muted-foreground">Data Carga</label>
+                      <label className="text-xs uppercase tracking-wider text-muted-foreground">
+                        Data Carga
+                      </label>
                       <input
                         type="date"
                         value={dataCarga}
@@ -306,7 +362,9 @@ function UploadPage() {
                       />
                     </div>
                     <div>
-                      <label className="text-xs uppercase tracking-wider text-muted-foreground">Hora Carga</label>
+                      <label className="text-xs uppercase tracking-wider text-muted-foreground">
+                        Hora Carga
+                      </label>
                       <input
                         type="time"
                         value={horaCarga}
@@ -315,13 +373,29 @@ function UploadPage() {
                       />
                     </div>
                   </div>
-                  <InfoRow icon={<MapPin className="size-4" />} label="Local Carga" value={extracted.transporte.carga_local} />
-                  <InfoRow icon={<MapPin className="size-4" />} label="Local Descarga" value={extracted.transporte.descarga_local} />
+                  <InfoRow
+                    icon={<MapPin className="size-4" />}
+                    label="Local Carga"
+                    value={extracted.transporte.carga_local}
+                  />
+                  <InfoRow
+                    icon={<MapPin className="size-4" />}
+                    label="Local Descarga"
+                    value={extracted.transporte.descarga_local}
+                  />
                   {extracted.transporte.disponibilizacao && (
-                    <InfoRow icon={<Calendar className="size-4" />} label="Disponibilização" value={extracted.transporte.disponibilizacao} />
+                    <InfoRow
+                      icon={<Calendar className="size-4" />}
+                      label="Disponibilização"
+                      value={extracted.transporte.disponibilizacao}
+                    />
                   )}
                   {extracted.transporte.certificacao && (
-                    <InfoRow icon={<FileCheck className="size-4" />} label="Certificação" value={extracted.transporte.certificacao} />
+                    <InfoRow
+                      icon={<FileCheck className="size-4" />}
+                      label="Certificação"
+                      value={extracted.transporte.certificacao}
+                    />
                   )}
                 </div>
               )}

@@ -66,9 +66,9 @@ export type Checklist = {
   submitted_at?: number;
   // Datas extraídas do PDF
   data_documento?: string; // ex: 2026-05-05
-  data_carga?: string;     // ex: 2026-05-06
-  hora_carga?: string;     // ex: 07:00
-  numero_guia?: string;    // ex: GT.2026/67
+  data_carga?: string; // ex: 2026-05-06
+  hora_carga?: string; // ex: 07:00
+  numero_guia?: string; // ex: GT.2026/67
   // Extra PDF metadata
   pdf_metadata?: PdfMetadata;
 };

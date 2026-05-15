@@ -142,7 +142,8 @@ function Dashboard() {
                       {c.numero_guia || c.codigo_at || "Sem código AT"}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {c.items.length} artigos • {new Date(c.created_at).toLocaleDateString("pt-PT")}
+                      {c.items.length} artigos •{" "}
+                      {new Date(c.created_at).toLocaleDateString("pt-PT")}
                     </p>
                   </div>
                   <span
@@ -168,7 +169,9 @@ function StatCard({ label, value, accent }: { label: string; value: number; acce
   return (
     <div
       className={`rounded-2xl p-4 ${
-        accent ? "bg-secondary text-secondary-foreground" : "bg-primary-foreground/10 text-primary-foreground"
+        accent
+          ? "bg-secondary text-secondary-foreground"
+          : "bg-primary-foreground/10 text-primary-foreground"
       }`}
     >
       <p className="text-3xl font-bold">{value}</p>

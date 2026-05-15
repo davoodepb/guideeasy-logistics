@@ -50,11 +50,7 @@ export async function createChecklistStore(c: Omit<Checklist, "id">): Promise<st
 }
 
 export async function getChecklistStore(id: string): Promise<Checklist | null> {
-  const { data, error } = await supabase
-    .from("checklists")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
+  const { data, error } = await supabase.from("checklists").select("*").eq("id", id).maybeSingle();
   if (error || !data) return null;
   const { data: items } = await supabase
     .from("checklist_items")
@@ -111,10 +107,13 @@ export async function updateChecklistStore(id: string, patch: Partial<Checklist>
 }
 
 export async function logUserStore(name: string, phone: string) {
-  await supabase.from("app_users").insert({ name, phone }).then(
-    () => {},
-    (e) => console.warn("app_users insert falhou:", e),
-  );
+  await supabase
+    .from("app_users")
+    .insert({ name, phone })
+    .then(
+      () => {},
+      (e) => console.warn("app_users insert falhou:", e),
+    );
   fbLogUser(name, phone).catch(() => {});
 }
 
