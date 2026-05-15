@@ -100,6 +100,7 @@ function RootShell({ children }: { children: React.ReactNode }) {
     <html lang="pt-PT">
       <head>
         <HeadContent />
+        <script dangerouslySetInnerHTML={{ __html: "window.deferredPrompt = null; window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); window.deferredPrompt = e; });" }} />
       </head>
       <body>
         {children}
@@ -151,4 +152,5 @@ function RootComponent() {
     </QueryClientProvider>
   );
 }
+
 
