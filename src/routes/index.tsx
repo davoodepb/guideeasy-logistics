@@ -93,7 +93,7 @@ function LoginPage() {
           </form>
 
           {/* PWA Install Button */}
-          <div className="flex justify-center mt-4"><InstallAppButton /></div>
+          <InstallAppButton variant="full" />
 
           <p className="mt-6 text-center text-xs text-primary-foreground/60">
             <Link to="/dashboard">Ir para a aplicaÃ§Ã£o</Link>
@@ -103,5 +103,6 @@ function LoginPage() {
     </main>
   );
 }
+
 
 

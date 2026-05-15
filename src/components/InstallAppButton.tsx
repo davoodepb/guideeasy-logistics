@@ -2,7 +2,7 @@
 import { Download } from "lucide-react";
 import { toast } from "sonner";
 
-export function InstallAppButton() {
+export function InstallAppButton({ variant = "icon" }: { variant?: "icon" | "full" }) {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [isStandalone, setIsStandalone] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
@@ -33,10 +33,22 @@ export function InstallAppButton() {
         setInstallPrompt(null);
       }
     } else if (isIOS) {
-      toast.info("Para instalar no iOS: toque em Partilhar e selecione 'Adicionar ao Ecrã Principal'.", { duration: 5000 });
+      toast.info("Para instalar no iOS: toque no ícone de Partilhar e selecione 'Adicionar ao Ecrã Principal'.", { duration: 5000 });
     } else {
-      toast.info("A instalação da App não está disponível no seu browser atual (tente Chrome/Safari) ou já está instalada.", { duration: 5000 });
+      toast.info("A instalação da App não está disponível no browser atual ou já se encontra instalada.", { duration: 5000 });
     }
+  }
+
+  if (variant === "full") {
+    return (
+      <button
+        onClick={handleInstall}
+        className="mt-4 w-full h-12 rounded-xl bg-secondary/20 border-2 border-secondary text-primary-foreground font-semibold flex items-center justify-center gap-2 hover:bg-secondary/30 transition"
+      >
+        <Download className="size-5" />
+        Instalar App no Telemóvel
+      </button>
+    );
   }
 
   return (
