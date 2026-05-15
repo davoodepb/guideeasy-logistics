@@ -69,6 +69,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:title", content: "Prudêncio Checklist — Guias de Transporte" },
       { name: "twitter:description", content: "PWA para automação de Guias de Transporte: PDF → Checklist → WhatsApp → Mobile." },
       { name: "twitter:card", content: "summary" },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/edd4210b-188a-4153-8e81-ca6d5fba171d/id-preview-432c1843--10f8940c-ad82-4bcd-8804-996d73a935eb.lovable.app-1778804025924.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/edd4210b-188a-4153-8e81-ca6d5fba171d/id-preview-432c1843--10f8940c-ad82-4bcd-8804-996d73a935eb.lovable.app-1778804025924.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
