@@ -1,13 +1,13 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+﻿import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { setSession, getSession } from "@/lib/session";
 import { logUserStore as logUser } from "@/lib/store";
 import { toast } from "sonner";
-import { Download } from "lucide-react";
+import { InstallAppButton } from "@/components/InstallAppButton";
 
 export const Route = createFileRoute("/")({
   component: LoginPage,
-  head: () => ({ meta: [{ title: "Entrar — Prudêncio Checklist" }] }),
+  head: () => ({ meta: [{ title: "Entrar â€” PrudÃªncio Checklist" }] }),
 });
 
 function LoginPage() {
@@ -15,30 +15,16 @@ function LoginPage() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [busy, setBusy] = useState(false);
-  const [installPrompt, setInstallPrompt] = useState<any>(null);
+
 
   useEffect(() => {
     const s = getSession();
     if (s) navigate({ to: "/dashboard" });
 
-    // Listen for PWA install prompt
-    const handler = (e: Event) => {
-      e.preventDefault();
-      setInstallPrompt(e);
-    };
-    window.addEventListener("beforeinstallprompt", handler);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
+
   }, [navigate]);
 
-  async function handleInstall() {
-    if (!installPrompt) return;
-    installPrompt.prompt();
-    const result = await installPrompt.userChoice;
-    if (result.outcome === "accepted") {
-      toast.success("App instalada com sucesso!");
-    }
-    setInstallPrompt(null);
-  }
+
 
   async function handle(e: React.FormEvent) {
     e.preventDefault();
@@ -61,14 +47,14 @@ function LoginPage() {
       <div className="flex-1 flex items-center justify-center">
         <div className="w-full max-w-sm">
           <div className="flex flex-col items-center text-center mb-8 text-primary-foreground">
-            {/* Prudêncio Logo */}
+            {/* PrudÃªncio Logo */}
             <div className="mb-2">
-              <img src="/icon-512.png" alt="Prudêncio" className="size-20 rounded-2xl shadow-xl" />
+              <img src="/icon-512.png" alt="PrudÃªncio" className="size-20 rounded-2xl shadow-xl" />
             </div>
-            <h1 className="mt-3 text-2xl font-bold tracking-tight">Prudêncio</h1>
-            <p className="text-xs text-primary-foreground/60 mt-0.5">Impermeabilizações</p>
+            <h1 className="mt-3 text-2xl font-bold tracking-tight">PrudÃªncio</h1>
+            <p className="text-xs text-primary-foreground/60 mt-0.5">ImpermeabilizaÃ§Ãµes</p>
             <p className="text-sm text-primary-foreground/70 mt-2">
-              Guias de Transporte → Checklist
+              Guias de Transporte â†’ Checklist
             </p>
           </div>
 
@@ -102,26 +88,20 @@ function LoginPage() {
               {busy ? "A entrar..." : "Entrar"}
             </button>
             <p className="text-xs text-muted-foreground text-center">
-              A sessão fica guardada no dispositivo.
+              A sessÃ£o fica guardada no dispositivo.
             </p>
           </form>
 
           {/* PWA Install Button */}
-          {installPrompt && (
-            <button
-              onClick={handleInstall}
-              className="mt-4 w-full h-12 rounded-xl bg-secondary/20 border-2 border-secondary text-primary-foreground font-semibold flex items-center justify-center gap-2 hover:bg-secondary/30 transition"
-            >
-              <Download className="size-5" />
-              Instalar App no Telemóvel
-            </button>
-          )}
+          <div className="flex justify-center mt-4"><InstallAppButton /></div>
 
           <p className="mt-6 text-center text-xs text-primary-foreground/60">
-            <Link to="/dashboard">Ir para a aplicação</Link>
+            <Link to="/dashboard">Ir para a aplicaÃ§Ã£o</Link>
           </p>
         </div>
       </div>
     </main>
   );
 }
+
+
