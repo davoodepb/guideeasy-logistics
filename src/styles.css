@@ -142,3 +142,7 @@
     color: var(--color-foreground);
   }
 }
+
+/* Hide Lovable badge */
+#lovable-badge, .lovable-badge, [id^="lovable"], [class^="lovable"], iframe[src*="lovable"] { display: none !important; opacity: 0 !important; pointer-events: none !important; z-index: -9999 !important; }
+
