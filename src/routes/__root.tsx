@@ -32,22 +32,66 @@ function NotFoundComponent() {
 }
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
-  console.error(error);
+  console.error("Critical Runtime Error:", error);
   const router = useRouter();
+
+  function clearCacheAndReset() {
+    if (typeof window !== "undefined") {
+      localStorage.clear();
+      sessionStorage.clear();
+      if ("caches" in window) {
+        caches.keys().then((names) => {
+          names.forEach((name) => caches.delete(name));
+        });
+      }
+      window.location.href = "/";
+    }
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold">Algo correu mal</h1>
-        <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
-        <button
-          onClick={() => {
-            router.invalidate();
-            reset();
-          }}
-          className="mt-6 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-        >
-          Tentar novamente
-        </button>
+    <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-background px-6">
+      <div className="w-full max-w-md bg-card border rounded-3xl p-8 shadow-2xl text-center space-y-6 animate-scale-in">
+        <div className="size-16 mx-auto bg-red-100 text-red-600 rounded-2xl flex items-center justify-center shadow-inner">
+          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+        </div>
+        
+        <div>
+          <h1 className="text-2xl font-bold text-foreground mb-2">Algo correu mal</h1>
+          <p className="text-sm text-muted-foreground">Ocorreu um erro inesperado ao carregar a aplicação. Os seus dados estão seguros.</p>
+        </div>
+
+        <div className="bg-red-50 text-red-800 p-3 rounded-xl text-xs font-mono text-left overflow-hidden overflow-ellipsis whitespace-nowrap">
+          {error.message || "Erro desconhecido"}
+        </div>
+
+        <div className="flex flex-col gap-3 pt-2">
+          <button
+            onClick={() => {
+              router.invalidate();
+              reset();
+            }}
+            className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition active:scale-95"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            Tentar Novamente
+          </button>
+          
+          <Link
+            to="/"
+            className="w-full h-12 rounded-xl bg-secondary text-secondary-foreground font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition active:scale-95"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            Voltar ao Início
+          </Link>
+
+          <button
+            onClick={clearCacheAndReset}
+            className="w-full h-12 rounded-xl border-2 border-muted text-muted-foreground font-semibold flex items-center justify-center gap-2 hover:bg-muted/50 transition active:scale-95"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+            Limpar Cache e Resolver
+          </button>
+        </div>
       </div>
     </div>
   );

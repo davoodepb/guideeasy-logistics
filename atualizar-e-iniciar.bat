@@ -12,7 +12,7 @@ echo.
 
 echo [2/4] A guardar alteracoes no Git...
 call git add -A
-call git commit -m "fix: QR Code alta resolucao, PWA install real, QR Code Detetado no Excel e WhatsApp, manifest corrigido"
+call git commit -m "fix: resolver erro critico SSR com window object e melhorar ErrorBoundary"
 echo.
 
 echo [3/4] A enviar para o GitHub...

@@ -119,7 +119,8 @@ export function InstallAppButton({ variant = "icon" }: { variant?: "icon" | "ful
 
   if (isStandalone) return null;
 
-  const hasPrompt = !!(installPrompt || (window as any).deferredPrompt);
+  const isBrowser = typeof window !== "undefined";
+  const hasPrompt = !!(installPrompt || (isBrowser && (window as any).deferredPrompt));
   const label = hasPrompt
     ? "📥 Instalar Aplicação"
     : isIOS

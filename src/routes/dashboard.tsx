@@ -62,7 +62,7 @@ function Dashboard() {
 
   const pendentes = items.filter((i) => i.status === "pendente");
   const concluidas = items.filter((i) => i.status === "concluida");
-  const totalArtigos = items.reduce((s, c) => s + c.items.length, 0);
+  const totalArtigos = items.reduce((s, c) => s + (c.items?.length || 0), 0);
 
   return (
     <main className="min-h-[100dvh] bg-background pb-24">
