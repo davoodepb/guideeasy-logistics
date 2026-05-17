@@ -51,6 +51,7 @@ export type PdfMetadata = {
   descarga_morada?: string;
   disponibilizacao?: string;
   certificacao?: string;
+  qr_raw?: string;
 };
 
 export type Checklist = {
@@ -69,6 +70,7 @@ export type Checklist = {
   data_carga?: string; // ex: 2026-05-06
   hora_carga?: string; // ex: 07:00
   numero_guia?: string; // ex: GT.2026/67
+  pdf_name?: string; // ex: Guia_2026_67.pdf
   // Extra PDF metadata
   pdf_metadata?: PdfMetadata;
 };

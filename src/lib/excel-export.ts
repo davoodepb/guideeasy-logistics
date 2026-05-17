@@ -23,7 +23,7 @@ export function exportChecklistToExcel(c: Checklist) {
     i.quantidade,
     i.unidade,
     i.checked ? "✓ Confirmado" : "Pendente",
-    c.codigo_at ? "QR Detetado ✓" : "Não detetado",
+    pdf.qr_raw ? pdf.qr_raw.split("*").join("\n") : (c.codigo_at ? "QR LIDO ✓ (Dados não guardados)" : "Não detetado"),
     c.observacoes_renato || "",
     "Validado",
   ]);
@@ -31,7 +31,7 @@ export function exportChecklistToExcel(c: Checklist) {
   const wsArt = XLSX.utils.aoa_to_sheet([hdr, ...rows]);
   wsArt["!cols"] = [
     { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 18 }, { wch: 20 }, { wch: 55 },
-    { wch: 14 }, { wch: 10 }, { wch: 14 }, { wch: 18 }, { wch: 35 }, { wch: 16 },
+    { wch: 14 }, { wch: 10 }, { wch: 14 }, { wch: 80 }, { wch: 35 }, { wch: 16 },
   ];
   wsArt["!autofilter"] = { ref: `A1:L${rows.length + 1}` };
 

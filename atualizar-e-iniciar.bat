@@ -12,7 +12,7 @@ echo.
 
 echo [2/4] A guardar alteracoes no Git...
 call git add -A
-call git commit -m "fix: resolver erro critico SSR com window object e melhorar ErrorBoundary"
+call git commit -m "feat: layout rigoroso Whatsapp e Excel, grid de ferramentas completas no final da pagina"
 echo.
 
 echo [3/4] A enviar para o GitHub...

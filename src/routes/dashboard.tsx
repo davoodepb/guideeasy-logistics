@@ -6,8 +6,10 @@ import { InstallAppButton } from "@/components/InstallAppButton";
 import { toast } from "sonner";
 import {
   Upload, ClipboardList, CheckCircle2, LogOut, Clock, Shield,
-  FileSpreadsheet, BarChart3, Trash2, X,
+  FileSpreadsheet, BarChart3, Trash2, X, Search, FileText, Download as DownloadIcon, Smartphone, Calendar, Hash, Check
 } from "lucide-react";
+import { exportChecklistToExcel } from "@/lib/excel-export";
+import { shareViaWhatsApp } from "@/lib/whatsapp";
 
 export const Route = createFileRoute("/dashboard")({
   component: Dashboard,
@@ -21,6 +23,7 @@ function Dashboard() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showDeleteAll, setShowDeleteAll] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   function loadData() {
     setLoading(true);
@@ -123,57 +126,103 @@ function Dashboard() {
         </section>
       )}
 
-      {/* Recent Activity */}
-      <section className="px-5 mt-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
-          <span className="size-1.5 bg-secondary rounded-full" /> Atividade recente
-        </h2>
+      {/* Search and History */}
+      <section className="px-5 mt-8">
+        <div className="flex flex-col gap-3 mb-4">
+          <h2 className="text-lg font-bold flex items-center gap-2">
+            <ClipboardList className="size-5 text-primary" /> Histórico de Documentos
+          </h2>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Procurar guia, ATCUD, data..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-11 pl-10 pr-4 rounded-xl border bg-card text-sm focus:ring-2 focus:ring-primary/20 outline-none transition"
+            />
+          </div>
+        </div>
+
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
         ) : items.length === 0 ? (
           <div className="bg-card rounded-2xl p-8 text-center border border-dashed animate-fade-in-up">
-            <ClipboardList className="size-10 text-muted-foreground mx-auto opacity-50" />
-            <p className="mt-3 text-sm text-muted-foreground">Sem checklists. Carregue uma Guia para começar.</p>
+            <FileText className="size-10 text-muted-foreground mx-auto opacity-50" />
+            <p className="mt-3 text-sm text-muted-foreground">Nenhum documento encontrado.</p>
           </div>
         ) : (
-          <ul className="space-y-2">
-            {items.map((c, idx) => (
-              <li key={c.id} className="animate-fade-in-up" style={{ animationDelay: `${idx * 50}ms` }}>
-                <div className="flex items-center gap-2 bg-card rounded-xl border hover:border-secondary/50 hover:shadow-md transition-all">
-                  <Link
-                    to={c.status === "concluida" ? "/completed/$id" : "/checklist/$id"}
-                    params={{ id: c.id }}
-                    className="flex items-center gap-3 p-4 flex-1 min-w-0"
-                  >
-                    <div className={`size-10 rounded-lg flex items-center justify-center shrink-0 ${
-                      c.status === "concluida" ? "bg-secondary/20 text-secondary" : "bg-primary/10 text-primary"
-                    }`}>
-                      {c.status === "concluida" ? <CheckCircle2 className="size-5" /> : <Clock className="size-5" />}
+          <div className="space-y-4">
+            {items
+              .filter((c) => {
+                if (!searchQuery) return true;
+                const q = searchQuery.toLowerCase();
+                return (
+                  c.numero_guia?.toLowerCase().includes(q) ||
+                  c.codigo_at?.toLowerCase().includes(q) ||
+                  c.pdf_metadata?.atcud?.toLowerCase().includes(q) ||
+                  c.data_documento?.includes(q) ||
+                  c.pdf_name?.toLowerCase().includes(q)
+                );
+              })
+              .map((c, idx) => {
+                const date = c.data_documento || new Date(c.created_at).toLocaleDateString("pt-PT");
+                const time = new Date(c.created_at).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+                
+                return (
+                  <div key={c.id} className="bg-card rounded-2xl border shadow-sm overflow-hidden animate-fade-in-up" style={{ animationDelay: `${idx * 50}ms` }}>
+                    {/* Header: PDF Name */}
+                    <div className="bg-muted/30 px-4 py-3 border-b flex items-center gap-3">
+                      <FileText className="size-4 text-primary shrink-0" />
+                      <p className="font-semibold text-sm truncate">{c.pdf_name || `Guia_${c.numero_guia || "Sem_Numero"}.pdf`}</p>
+                      {c.status === "concluida" ? (
+                        <span className="ml-auto text-[10px] uppercase font-bold tracking-wider px-2 py-1 bg-green-100 text-green-700 rounded-full">Validado</span>
+                      ) : (
+                        <span className="ml-auto text-[10px] uppercase font-bold tracking-wider px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full">Pendente</span>
+                      )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold truncate">{c.numero_guia || c.codigo_at || "Sem código AT"}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {c.items.length} artigos • {new Date(c.created_at).toLocaleDateString("pt-PT")}
-                      </p>
+                    
+                    <Link to={c.status === "concluida" ? "/completed/$id" : "/checklist/$id"} params={{ id: c.id }}>
+                      {/* Body: Details */}
+                      <div className="p-4 grid grid-cols-2 gap-y-3 gap-x-2 text-sm">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Calendar className="size-4 shrink-0" /> <span className="truncate">{date}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Clock className="size-4 shrink-0" /> <span>{time}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-foreground font-medium">
+                          <Hash className="size-4 text-muted-foreground shrink-0" /> <span className="truncate">{c.numero_guia || "—"}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-foreground font-medium text-xs">
+                          <Shield className="size-4 text-muted-foreground shrink-0" /> <span className="truncate font-mono">{c.pdf_metadata?.atcud || "—"}</span>
+                        </div>
+                        <div className="col-span-2 flex items-center gap-2 text-green-600 font-medium text-xs mt-1">
+                          <CheckCircle2 className="size-4 shrink-0" /> {c.codigo_at ? "QR Detetado" : "Sem QR"}
+                          <span className="text-muted/30 mx-1">•</span>
+                          <CheckCircle2 className="size-4 shrink-0" /> {c.status === "concluida" ? "Excel Gerado" : "Aguarda Excel"}
+                        </div>
+                      </div>
+                    </Link>
+
+                    {/* Actions */}
+                    <div className="px-4 py-3 bg-muted/10 border-t grid grid-cols-3 gap-2">
+                      <button onClick={() => exportChecklistToExcel(c)} className="h-9 rounded-lg bg-blue-50 text-blue-600 font-semibold text-xs flex items-center justify-center gap-1.5 hover:bg-blue-100 transition">
+                        <DownloadIcon className="size-3.5" /> Excel
+                      </button>
+                      <button onClick={() => shareViaWhatsApp(c)} className="h-9 rounded-lg bg-green-50 text-green-600 font-semibold text-xs flex items-center justify-center gap-1.5 hover:bg-green-100 transition">
+                        <Smartphone className="size-3.5" /> WhatsApp
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); setDeleteId(c.id); }} className="h-9 rounded-lg border border-red-100 bg-red-50 text-red-600 font-semibold text-xs flex items-center justify-center gap-1.5 hover:bg-red-100 transition">
+                        <Trash2 className="size-3.5" /> Apagar
+                      </button>
                     </div>
-                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full shrink-0 ${
-                      c.status === "concluida" ? "bg-secondary/15 text-secondary" : "bg-muted text-muted-foreground"
-                    }`}>
-                      {c.status === "concluida" ? "✓ Concluída" : "Pendente"}
-                    </span>
-                  </Link>
-                  {/* Delete button */}
-                  <button onClick={(e) => { e.stopPropagation(); setDeleteId(c.id); }}
-                    className="size-10 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 flex items-center justify-center transition mr-2 shrink-0"
-                    aria-label="Apagar">
-                    <Trash2 className="size-4" />
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
+                  </div>
+                );
+              })}
+          </div>
         )}
       </section>
 

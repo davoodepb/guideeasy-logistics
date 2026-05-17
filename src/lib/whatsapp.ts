@@ -23,7 +23,16 @@ export function formatWhatsAppMessage(c: Checklist, pageUrl?: string): string {
   if (pdf.atcud) msg += `🆔 *ATCUD:*\n${pdf.atcud}\n\n`;
 
   // QR Code status
-  msg += `📷 *QR Code:*\n${c.codigo_at ? "Detetado com sucesso ✅" : "Não detetado"}\n\n`;
+  msg += `📷 *QR Code:*\n`;
+  if (pdf.qr_raw) {
+    // Format raw string for better reading (replace * with \n  • )
+    const formattedQr = pdf.qr_raw.split("*").map(part => `  • ${part}`).join("\n");
+    msg += `📌 *Detetado:*\n${formattedQr}\n\n`;
+  } else if (c.codigo_at) {
+    msg += `📌 Detetado com sucesso\n\n`;
+  } else {
+    msg += `❌ Não detetado\n\n`;
+  }
 
   if (c.responsavel) msg += `👤 *Responsável:*\n${c.responsavel}\n\n`;
 
@@ -34,16 +43,16 @@ export function formatWhatsAppMessage(c: Checklist, pageUrl?: string): string {
 
   for (let i = 0; i < c.items.length; i++) {
     const it = c.items[i];
-    const check = it.checked ? "✅" : "⬜";
+    const check = it.checked ? "✅" : "📦";
 
     msg += `${check} *Artigo ${i + 1}*\n`;
-    msg += `📦 Código: ${it.artigo}\n`;
+    msg += `🔢 Código: ${it.artigo}\n`;
     msg += `📝 ${it.descricao}\n`;
-    msg += `🔢 Quantidade: ${it.quantidade} ${it.unidade}\n`;
+    msg += `📏 Quantidade: ${it.quantidade} ${it.unidade}\n`;
     if (c.codigo_at) msg += `🔐 Chave AT: ${c.codigo_at}\n`;
     if (pdf.atcud) msg += `🆔 ATCUD: ${pdf.atcud}\n`;
     if (c.numero_guia) msg += `🚚 Guia: ${c.numero_guia}\n`;
-    msg += `📷 QR Code: ${c.codigo_at ? "Detetado" : "—"}\n`;
+    msg += `📷 QR Code: ${pdf.qr_raw ? "Ver acima" : (c.codigo_at ? "Detetado" : "—")}\n`;
     if (i < c.items.length - 1) msg += "\n";
   }
 
@@ -52,7 +61,7 @@ export function formatWhatsAppMessage(c: Checklist, pageUrl?: string): string {
   msg += "📊 *RESUMO*\n";
   msg += "━━━━━━━━━━━━━━━━━━━━\n\n";
   msg += `📦 Total Artigos: ${c.items.length}\n`;
-  msg += `🔢 Quantidade Total: ${totalQty}\n`;
+  msg += `📏 Quantidade Total: ${totalQty}\n`;
   msg += `✅ Confirmados: ${confirmed}/${c.items.length}\n`;
 
   if (c.observacoes_renato) msg += `\n📌 *Observações:*\n${c.observacoes_renato}\n`;

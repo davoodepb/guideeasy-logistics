@@ -1,9 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { getChecklistStore as getChecklist, type Checklist } from "@/lib/store";
+import { getChecklistStore as getChecklist, deleteChecklistStore, type Checklist } from "@/lib/store";
 import { exportChecklistToExcel } from "@/lib/excel-export";
 import { shareViaWhatsApp } from "@/lib/whatsapp";
-import { ArrowLeft, CheckCircle2, Download, Loader2, MessageCircle, FileSpreadsheet, Calendar, User, Hash, FileText, Package, BarChart3 } from "lucide-react";
+import { InstallAppButton } from "@/components/InstallAppButton";
+import { ArrowLeft, CheckCircle2, Download, Loader2, MessageCircle, FileSpreadsheet, Calendar, User, Hash, FileText, Package, BarChart3, Trash2, FolderOpen } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/completed/$id")({
@@ -100,21 +101,50 @@ function CompletedPage() {
         </div>
       </section>
 
-      {/* ═══ FIXED BOTTOM TOOLBAR ═══ */}
-      <div className="fixed bottom-0 inset-x-0 bg-background/95 backdrop-blur-lg border-t shadow-2xl p-4 z-50">
-        <div className="grid grid-cols-3 gap-3">
+      {/* ═══ EXPANDED BOTTOM ACTIONS ═══ */}
+      <div className="mt-8 mb-6 px-4 space-y-4 animate-fade-in-up" style={{ animationDelay: "300ms" }}>
+        
+        {/* Core Actions Grid */}
+        <div className="grid grid-cols-2 gap-3">
           <button onClick={() => { exportChecklistToExcel(c); toast.success("Excel exportado!"); }}
-            className="h-13 rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2 text-sm shadow transition active:scale-[0.98]">
-            <Download className="size-4" /> Excel
+            className="h-14 rounded-xl bg-blue-600 text-white font-bold flex items-center justify-center gap-2 text-sm shadow-lg transition hover:bg-blue-500 active:scale-[0.98]">
+            <Download className="size-5" /> Download Excel
           </button>
-          <button onClick={exportCSV}
-            className="h-13 rounded-xl bg-primary/80 text-primary-foreground font-semibold flex items-center justify-center gap-2 text-sm shadow transition active:scale-[0.98]">
-            <FileSpreadsheet className="size-4" /> CSV
-          </button>
+
           <button onClick={() => shareViaWhatsApp(c, `${window.location.origin}/completed/${id}`)}
-            className="h-13 rounded-xl bg-[#25D366] text-white font-semibold flex items-center justify-center gap-2 text-sm shadow transition active:scale-[0.98]">
-            <MessageCircle className="size-4" /> WhatsApp
+            className="h-14 rounded-xl bg-[#25D366] text-white font-bold flex items-center justify-center gap-2 text-sm shadow-lg transition hover:bg-[#20b858] active:scale-[0.98]">
+            <MessageCircle className="size-5" /> Enviar WhatsApp
           </button>
+
+          <button onClick={exportCSV}
+            className="h-14 rounded-xl border-2 border-primary text-primary font-bold flex items-center justify-center gap-2 text-sm shadow-sm transition hover:bg-primary/10 active:scale-[0.98]">
+            <FileSpreadsheet className="size-5" /> Download CSV
+          </button>
+
+          <Link to="/dashboard"
+            className="h-14 rounded-xl border-2 border-muted bg-card text-foreground font-bold flex items-center justify-center gap-2 text-sm shadow-sm transition hover:bg-muted/50 active:scale-[0.98]">
+            <FolderOpen className="size-5" /> Histórico
+          </Link>
+        </div>
+
+        <button onClick={async () => {
+          if (confirm("Tem a certeza que deseja apagar este documento permanentemente?")) {
+            try {
+              await deleteChecklistStore(c.id);
+              toast.success("Documento apagado com sucesso.");
+              navigate({ to: "/dashboard" });
+            } catch (e: any) {
+              toast.error(e.message);
+            }
+          }
+        }}
+          className="w-full h-12 rounded-xl bg-red-50 text-red-600 font-bold flex items-center justify-center gap-2 text-sm transition hover:bg-red-100 active:scale-[0.98]">
+          <Trash2 className="size-4" /> Apagar PDF
+        </button>
+
+        {/* App Install Button */}
+        <div className="pt-4 border-t">
+          <InstallAppButton variant="full" />
         </div>
       </div>
     </main>

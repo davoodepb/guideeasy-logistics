@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Download, Share, X, Smartphone, Monitor } from "lucide-react";
+import { Download, Share, X, Smartphone, Monitor, Apple } from "lucide-react";
 import { toast } from "sonner";
 
 export function InstallAppButton({ variant = "icon" }: { variant?: "icon" | "full" }) {
@@ -117,17 +117,34 @@ export function InstallAppButton({ variant = "icon" }: { variant?: "icon" | "ful
     );
   }
 
-  if (isStandalone) return null;
-
   const isBrowser = typeof window !== "undefined";
   const hasPrompt = !!(installPrompt || (isBrowser && (window as any).deferredPrompt));
+  
+  if (isStandalone) {
+    const label = "✅ App Instalada";
+    if (variant === "full") {
+      return (
+        <button disabled className="w-full h-14 rounded-xl font-bold text-base flex items-center justify-center gap-3 transition shadow-lg bg-green-50 text-green-700 opacity-80 cursor-not-allowed">
+          <Monitor className="size-5" />
+          {label}
+        </button>
+      );
+    }
+    return (
+      <button disabled className="size-12 rounded-full shadow-lg flex items-center justify-center bg-green-50 text-green-700 opacity-80 cursor-not-allowed" title={label}>
+        <Monitor className="size-5" />
+      </button>
+    );
+  }
   const label = hasPrompt
     ? "📥 Instalar Aplicação"
     : isIOS
-      ? "📲 Instalar App (iPhone)"
+      ? "🍎 Instalar App iPhone"
       : isAndroid
-        ? "📲 Instalar App (Android)"
-        : "💻 Instalar App (Desktop)";
+        ? "📥 Instalar App Android"
+        : "💻 Instalar App Desktop";
+
+  const Icon = hasPrompt ? Download : isIOS ? Apple : isAndroid ? Smartphone : Monitor;
 
   return (
     <>
@@ -144,7 +161,7 @@ export function InstallAppButton({ variant = "icon" }: { variant?: "icon" | "ful
           {installing ? (
             <span className="size-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
           ) : (
-            <Download className="size-5" />
+            <Icon className="size-5" />
           )}
           {label}
         </button>
@@ -160,7 +177,11 @@ export function InstallAppButton({ variant = "icon" }: { variant?: "icon" | "ful
           aria-label="Instalar App"
           title={label}
         >
-          <Download className="size-5" />
+          {installing ? (
+            <span className="size-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <Icon className="size-5" />
+          )}
         </button>
       )}
 

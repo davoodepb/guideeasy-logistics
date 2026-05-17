@@ -1,5 +1,5 @@
-// Prudêncio Checklist — Service Worker v2 for PWA
-const CACHE_NAME = "prudencio-v2";
+// Prudêncio Checklist — Service Worker v3 for PWA
+const CACHE_NAME = "prudencio-v3";
 const PRECACHE_URLS = [
   "/",
   "/icon-512.png",

@@ -1,11 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { getChecklistStore as getChecklist, updateChecklistStore as updateChecklist, type Checklist } from "@/lib/store";
+import { getChecklistStore as getChecklist, updateChecklistStore as updateChecklist, deleteChecklistStore, type Checklist } from "@/lib/store";
 import { exportChecklistToExcel } from "@/lib/excel-export";
 import { shareViaWhatsApp } from "@/lib/whatsapp";
 import { getSession } from "@/lib/session";
+import { InstallAppButton } from "@/components/InstallAppButton";
 import { toast } from "sonner";
-import { ArrowLeft, Send, MessageCircle, Loader2, Download, CheckCircle2, Package } from "lucide-react";
+import { ArrowLeft, Send, MessageCircle, Loader2, Download, CheckCircle2, Package, Save, Trash2, FolderOpen } from "lucide-react";
 
 export const Route = createFileRoute("/checklist/$id")({
   component: ChecklistPage,
@@ -124,21 +125,52 @@ function ChecklistPage() {
         </div>
       </section>
 
-      {/* ═══ FIXED BOTTOM TOOLBAR ═══ */}
-      <div className="fixed bottom-0 inset-x-0 bg-background/95 backdrop-blur-lg border-t shadow-2xl p-4 space-y-3 z-50">
-        <div className="grid grid-cols-3 gap-3">
-          <button onClick={() => { exportChecklistToExcel(c); toast.success("Excel exportado!"); }}
-            className="h-12 rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2 text-sm shadow transition active:scale-[0.98]">
-            <Download className="size-4" /> Excel
-          </button>
-          <button onClick={() => shareViaWhatsApp(c, `${window.location.origin}/checklist/${id}`)}
-            className="h-12 rounded-xl bg-[#25D366] text-white font-semibold flex items-center justify-center gap-2 text-sm shadow transition active:scale-[0.98]">
-            <MessageCircle className="size-4" /> WhatsApp
-          </button>
+      {/* ═══ EXPANDED BOTTOM ACTIONS ═══ */}
+      <div className="mt-8 mb-6 px-4 space-y-4 animate-fade-in-up" style={{ animationDelay: "300ms" }}>
+        
+        {/* Core Actions Grid */}
+        <div className="grid grid-cols-2 gap-3">
           <button onClick={submit} disabled={busy}
-            className="h-12 rounded-xl bg-secondary text-secondary-foreground font-semibold flex items-center justify-center gap-2 text-sm shadow transition active:scale-[0.98] disabled:opacity-60">
-            {busy ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />} Submeter
+            className="h-14 rounded-xl bg-secondary text-secondary-foreground font-bold flex items-center justify-center gap-2 text-sm shadow-lg transition hover:bg-secondary/90 active:scale-[0.98] disabled:opacity-60">
+            {busy ? <Loader2 className="size-5 animate-spin" /> : <Save className="size-5" />} Guardar
           </button>
+          
+          <button onClick={() => { exportChecklistToExcel(c); toast.success("Excel exportado!"); }}
+            className="h-14 rounded-xl bg-blue-600 text-white font-bold flex items-center justify-center gap-2 text-sm shadow-lg transition hover:bg-blue-500 active:scale-[0.98]">
+            <Download className="size-5" /> Download Excel
+          </button>
+
+          <button onClick={() => shareViaWhatsApp(c, `${window.location.origin}/checklist/${id}`)}
+            className="h-14 rounded-xl bg-[#25D366] text-white font-bold flex items-center justify-center gap-2 text-sm shadow-lg transition hover:bg-[#20b858] active:scale-[0.98]">
+            <MessageCircle className="size-5" /> Enviar WhatsApp
+          </button>
+
+          <Link to="/dashboard"
+            className="h-14 rounded-xl border-2 border-muted bg-card text-foreground font-bold flex items-center justify-center gap-2 text-sm shadow-sm transition hover:bg-muted/50 active:scale-[0.98]">
+            <FolderOpen className="size-5" /> Histórico
+          </Link>
+        </div>
+
+        <button onClick={async () => {
+          if (confirm("Tem a certeza que deseja apagar este documento permanentemente?")) {
+            setBusy(true);
+            try {
+              await deleteChecklistStore(c.id);
+              toast.success("Documento apagado com sucesso.");
+              navigate({ to: "/dashboard" });
+            } catch (e: any) {
+              toast.error(e.message);
+              setBusy(false);
+            }
+          }
+        }} disabled={busy}
+          className="w-full h-12 rounded-xl bg-red-50 text-red-600 font-bold flex items-center justify-center gap-2 text-sm transition hover:bg-red-100 active:scale-[0.98]">
+          <Trash2 className="size-4" /> Apagar PDF
+        </button>
+
+        {/* App Install Button */}
+        <div className="pt-4 border-t">
+          <InstallAppButton variant="full" />
         </div>
       </div>
     </main>

@@ -50,6 +50,7 @@ function UploadPage() {
       data_carga: dataCarga,
       hora_carga: horaCarga,
       numero_guia: numeroGuia,
+      pdf_name: file?.name || "",
       pdf_metadata: extracted ? {
         emissor_empresa: extracted.emissor.empresa,
         emissor_contribuinte: extracted.emissor.contribuinte,
@@ -66,6 +67,7 @@ function UploadPage() {
         descarga_morada: extracted.transporte.descarga_morada,
         disponibilizacao: extracted.transporte.disponibilizacao,
         certificacao: extracted.transporte.certificacao,
+        qr_raw: extracted.qr_raw,
       } : undefined,
     };
   }
