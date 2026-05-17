@@ -3,7 +3,6 @@
 
 import type { ChecklistItem } from "./firebase";
 
-/** Dados do emissor / remetente */
 export type EmissorData = {
   empresa: string;
   contribuinte: string;
@@ -12,13 +11,11 @@ export type EmissorData = {
   capital_social: string;
 };
 
-/** Dados do destinatário */
 export type DestinatarioData = {
   nome: string;
   morada: string;
 };
 
-/** Dados de transporte */
 export type TransporteData = {
   carga_local: string;
   carga_data: string;
@@ -29,7 +26,6 @@ export type TransporteData = {
   certificacao: string;
 };
 
-/** Validation log entry */
 export type ValidationEntry = {
   field: string;
   status: "ok" | "warning" | "error";
@@ -43,40 +39,28 @@ export type ExtractedData = {
   tipo_documento: string;
   data_documento: string;
   vn_contrib: string;
+  requisicao: string;
   data_carga: string;
   hora_carga: string;
   emissor: EmissorData;
   destinatario: DestinatarioData;
   transporte: TransporteData;
   items: ChecklistItem[];
-  // QR Code data
   qr_at_code: string;
   qr_raw: string;
   qr_confidence: number;
-  // Validation
   validations: ValidationEntry[];
   processing_time: number;
+  chave_at_needs_validation: boolean;
 };
-
-// ─── Known NIF patterns to NEVER treat as artigo ───
-const KNOWN_NIF_PATTERNS = [
-  /^[125689]\d{8}$/, // Portuguese NIF format
-  /^PT\d{9}$/i,      // VAT with PT prefix
-];
-
-// ─── Fiscal zone keywords — if nearby, code is NOT an artigo ───
-const FISCAL_ZONE_KEYWORDS = [
-  "contribuinte", "nif", "vat", "n.º contrib", "v/n", "cliente",
-  "telefone", "telemóvel", "fax", "email", "código postal",
-  "capital social", "conservatória", "matrícula", "certidão",
-];
 
 const UNIT_SET = new Set(["M2", "M3", "ML", "UN", "KG", "LT", "L", "PC", "CX", "SC", "UND", "MT", "M", "TON", "PAL"]);
 
 const STOP_TOKENS = [
-  "este documento", "processado por", "carga", "descarga", "atcud",
+  "este documento", "processado por", "atcud",
   "total", "totais", "iva", "observa", "pagamento", "rodape", "rodapé",
   "assinatura", "certificado", "software", "programa",
+  "não serve de fatura",
 ];
 
 const HEADER_NOISE = ["artigo", "descri", "qtd", "quant", "un.", "un "];
@@ -108,31 +92,86 @@ export async function extractFromPdf(file: File): Promise<ExtractedData> {
 
   const fullText = tokens.map((t) => t.str).join(" ");
 
-  // ──── DOCUMENT INFO ────
-  const chaveMatch = fullText.match(/Chave\s*AT[:\s]*([A-Z0-9]+)/i);
-  const chave_at = chaveMatch ? chaveMatch[1] : "";
+  // ──── CHAVE AT — CRITICAL: Extract ONLY from "Chave AT:" label ────
+  // The Chave AT is ALWAYS on a line that starts with "Chave AT:"
+  // It is NOT the NIF, NOT the V/N Contrib, NOT any other number
+  let chave_at = "";
+  let chave_at_needs_validation = false;
 
-  const atcudMatch = fullText.match(/ATCUD[:\s]*([A-Z0-9\-]+)/i);
+  // Method 1: Look for exact "Chave AT:" or "Chave AT :" followed by the code
+  const chaveMatch = fullText.match(/Chave\s+AT\s*[:\s]+(\d{8,})/i);
+  if (chaveMatch) {
+    chave_at = chaveMatch[1];
+    validations.push({ field: "chave_at", status: "ok", message: `Chave AT extraída do texto: ${chave_at}` });
+  }
+
+  // Method 2: If not found, try visual position — find "Chave" and "AT" tokens near each other
+  if (!chave_at) {
+    for (let i = 0; i < tokens.length - 2; i++) {
+      const t0 = tokens[i];
+      const t1 = tokens[i + 1];
+      if (
+        t0.str.toLowerCase().includes("chave") &&
+        t1.str.toLowerCase().includes("at")
+      ) {
+        // The next token(s) after "Chave AT" should be the code
+        for (let j = i + 2; j < Math.min(i + 5, tokens.length); j++) {
+          const candidate = tokens[j].str.replace(/[:\s]/g, "");
+          if (/^\d{8,}$/.test(candidate)) {
+            chave_at = candidate;
+            validations.push({ field: "chave_at", status: "ok", message: `Chave AT extraída por posição visual: ${chave_at}` });
+            break;
+          }
+        }
+        if (chave_at) break;
+      }
+    }
+  }
+
+  // If still not found, mark as needs validation
+  if (!chave_at) {
+    chave_at_needs_validation = true;
+    validations.push({ field: "chave_at", status: "error", message: "Chave AT não encontrada — necessita validação manual" });
+  }
+
+  // ──── ATCUD ────
+  const atcudMatch = fullText.match(/ATCUD[:\s]*([A-Z0-9][A-Z0-9\-]+)/i);
   const atcud = atcudMatch ? atcudMatch[1] : "";
 
-  const guiaMatch = fullText.match(/GT\s*GT\.?(\d{4}\/\d+)/i) || fullText.match(/GT\.?(\d{4}\/\d+)/i);
+  // ──── Número da Guia ────
+  const guiaMatch = fullText.match(/GT\s+GT\.?(\d{4}\/\d+)/i) || fullText.match(/GT\.?(\d{4}\/\d+)/i);
   const numero_guia = guiaMatch ? `GT.${guiaMatch[1]}` : "";
 
+  // ──── Tipo de Documento ────
   const tipoMatch = fullText.match(/Guia\s+de\s+[Tt]ransporte/i);
   const tipo_documento = tipoMatch ? "Guia de Transporte" : "";
 
-  const dataDocMatch = fullText.match(/Data[^0-9]{0,30}(\d{4}-\d{2}-\d{2})/i);
-  const data_documento = dataDocMatch ? dataDocMatch[1] : "";
+  // ──── Data do Documento ────
+  // Look specifically in the "Data" column near "Requisição"
+  let data_documento = "";
+  const dataDocMatch = fullText.match(/(?:Requisi[çc][ãa]o|Data)[^0-9]{0,40}(\d{4}-\d{2}-\d{2})/i);
+  if (dataDocMatch) {
+    data_documento = dataDocMatch[1];
+  } else {
+    // Fallback: first ISO date after "Data"
+    const fallbackDate = fullText.match(/Data[^0-9]{0,30}(\d{4}-\d{2}-\d{2})/i);
+    if (fallbackDate) data_documento = fallbackDate[1];
+  }
 
-  const vnContribMatch = fullText.match(/V\/N\.?\s*º?\s*Contrib\.?\s*[:\s]*(\d{6,})/i);
+  // ──── V/N.º Contrib (client NIF — NEVER treat as artigo) ────
+  const vnContribMatch = fullText.match(/V\/N\.?\s*[ºo]?\s*Contrib\.?\s*[:\s]*(\d{9})/i);
   const vn_contrib = vnContribMatch ? vnContribMatch[1] : "";
+
+  // ──── Requisição ────
+  const reqMatch = fullText.match(/Requisi[çc][ãa]o[:\s]*([A-Za-z0-9\-\/]+)/i);
+  const requisicao = reqMatch ? reqMatch[1].trim() : "";
 
   // ──── EMISSOR ────
   let empresa = "";
   const empresaMatch = fullText.match(/J\.\s*PRUD[EÊ]NCIO[,\s]*LDA/i);
   if (empresaMatch) empresa = "J. PRUDÊNCIO, LDA";
 
-  const contribMatch = fullText.match(/Contribuinte\s*N\.?\s*º?\s*[:\s]*(\d{9})/i);
+  const contribMatch = fullText.match(/Contribuinte\s*N\.?\s*[ºo]?\s*[:\s]*(\d{9})/i);
   const contribuinte = contribMatch ? contribMatch[1] : "";
 
   let morada_emissor = "";
@@ -140,7 +179,7 @@ export async function extractFromPdf(file: File): Promise<ExtractedData> {
   if (moradaMatch) morada_emissor = "Parque Industrial de Sete Fontes, BRAGA, 4710-553 BRAGA";
 
   let contactos = "";
-  const telMatch = fullText.match(/Telef\.?\s*(\d[\d\s]+)/i);
+  const telMatch = fullText.match(/Telef\.?\s*([\d\s]+)/i);
   if (telMatch) contactos = `Telef. ${telMatch[1].trim()}`;
   const emailMatch = fullText.match(/([a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,})/i);
   if (emailMatch) contactos += (contactos ? " / " : "") + emailMatch[1];
@@ -148,6 +187,11 @@ export async function extractFromPdf(file: File): Promise<ExtractedData> {
   let capital_social = "";
   const capitalMatch = fullText.match(/Capital\s+Social\s+([\d\s.,]+\s*EUR)/i);
   if (capitalMatch) capital_social = capitalMatch[1].trim();
+
+  // Matrícula / Cons. Reg. Com
+  let matricula = "";
+  const matMatch = fullText.match(/Matr[ií]cula\s+N\.?\s*[ºo]?\s*[:\s]*(\d+)/i);
+  if (matMatch) matricula = matMatch[1];
 
   const emissor: EmissorData = {
     empresa: empresa || "Prudêncio Impermeabilizações",
@@ -164,48 +208,50 @@ export async function extractFromPdf(file: File): Promise<ExtractedData> {
   const exmoIdx = fullText.indexOf("Exmo");
   if (exmoIdx >= 0) {
     const afterExmo = fullText.substring(exmoIdx);
-    const destLines = afterExmo.match(
-      /(?:Exmo.*?Sr.*?\s+)([A-ZÀ-ÿ][A-Za-zÀ-ÿ\s,.\-0-9]+?)(?:\s+(?:Rua|Av\.|R\.|Travessa|Largo|Praça))/i,
-    );
-    if (destLines) dest_nome = destLines[1].trim();
+    // Look for "Condomínio" pattern first
+    const condMatch = afterExmo.match(/(Condom[ií]nio\s+[A-Za-zÀ-ÿ\s,.\-0-9]+?\d+)/i);
+    if (condMatch) dest_nome = condMatch[1].trim();
 
+    // Look for street
     const ruaMatch = afterExmo.match(
       /((?:Rua|Av\.|R\.|Travessa|Largo|Praça)\s+[A-Za-zÀ-ÿ\s,.\-0-9]+?\d+)/i,
     );
     if (ruaMatch) dest_morada = ruaMatch[1].trim();
+
+    // If no specific street, try to get the full address
+    if (!dest_morada && dest_nome) {
+      dest_morada = dest_nome;
+    }
   }
 
+  // Fallback for Condomínio
   if (!dest_nome) {
     const condMatch = fullText.match(/(Condom[ií]nio\s+[A-Za-zÀ-ÿ\s,.\-0-9]+?\d+)/i);
     if (condMatch) dest_nome = condMatch[1].trim();
   }
 
-  if (!dest_morada) {
-    const postalMatches = [...fullText.matchAll(/(\d{4}-\d{3}\s+[A-Za-zÀ-ÿ]+)/gi)];
-    if (postalMatches.length >= 2) {
-      dest_morada = dest_nome ? `${dest_nome}, ${postalMatches[1][1]}` : postalMatches[1][1];
-    }
+  // Get postal code for destinatário
+  const postalMatches = [...fullText.matchAll(/(\d{4}-\d{3}\s+[A-Za-zÀ-ÿ]+)/gi)];
+  if (!dest_morada && postalMatches.length >= 2) {
+    dest_morada = dest_nome ? `${dest_nome}, ${postalMatches[1][1]}` : postalMatches[1][1];
   }
 
   const destinatario: DestinatarioData = { nome: dest_nome, morada: dest_morada };
 
   // ──── TRANSPORT ────
-  const cargaMatch =
-    fullText.match(/disposi[cç][aã]o\s+na\s+data\s+(\d{4}-\d{2}-\d{2})(?:\s*\/\s*(\d{1,2}:\d{2}))?/i) ||
-    fullText.match(/Carga[\s\S]{0,80}?(\d{4}-\d{2}-\d{2})(?:\s*\/\s*(\d{1,2}:\d{2}))?/i);
-  const data_carga = cargaMatch ? cargaMatch[1] : "";
-  const hora_carga = cargaMatch && cargaMatch[2] ? cargaMatch[2] : "";
+  // Look for Carga date/time
+  const cargaDateMatch =
+    fullText.match(/(?:N\/\s*Morada|Carga)[\s\-]*(\d{4}-\d{2}-\d{2})\s*\/?\s*(\d{1,2}:\d{2})?/i) ||
+    fullText.match(/disposi[cç][aã]o\s+na\s+data\s+(\d{4}-\d{2}-\d{2})(?:\s*\/\s*(\d{1,2}:\d{2}))?/i);
+  const data_carga = cargaDateMatch ? cargaDateMatch[1] : "";
+  const hora_carga = cargaDateMatch && cargaDateMatch[2] ? cargaDateMatch[2] : "";
 
   let carga_local = "";
-  const cargaLocalMatch = fullText.match(
-    /Carga.*?(?:N\/\s*Morada|Morada)[^A-Z]*([A-Za-zÀ-ÿ\s]+(?:de\s+)?[A-Za-zÀ-ÿ\s]+)/i,
-  );
-  if (cargaLocalMatch) carga_local = cargaLocalMatch[1].trim();
-  if (!carga_local && morada_emissor) carga_local = morada_emissor;
+  if (morada_emissor) carga_local = morada_emissor;
 
   let descarga_local = "";
   const descargaMatch = fullText.match(
-    /Descarga.*?(?:V\/\s*Morada|Morada)[^A-Z]*([A-Za-zÀ-ÿ\s,.\-0-9]+)/i,
+    /(?:V\/\s*Morada|Descarga)[^A-Z]*?((?:Rua|Av|R\.|Travessa|Largo|Praça|Condom)[A-Za-zÀ-ÿ\s,.\-0-9]+)/i,
   );
   if (descargaMatch) descarga_local = descargaMatch[1].trim();
 
@@ -214,7 +260,7 @@ export async function extractFromPdf(file: File): Promise<ExtractedData> {
   if (dispMatch) disponibilizacao = dispMatch[1];
 
   let certificacao = "";
-  const certMatch = fullText.match(/Processado\s+por\s+Programa\s+Certificado\s+n\.?\s*º?\s*([^\n(]+)/i);
+  const certMatch = fullText.match(/Processado\s+por\s+Programa\s+Certificado\s+n\.?\s*[ºo]?\s*([^\n|]+?)(?:\s*[/|]|\s*$)/i);
   if (certMatch) certificacao = certMatch[1].trim();
 
   const transporte: TransporteData = {
@@ -227,23 +273,22 @@ export async function extractFromPdf(file: File): Promise<ExtractedData> {
     certificacao,
   };
 
-  // ──── INTELLIGENT ARTIGO EXTRACTION ────
+  // ──── ARTIGO EXTRACTION ────
 
-  /** Check if a code is a forbidden fiscal number */
+  /** NEVER treat these as artigos */
   const isForbidden = (code: string, context: string): boolean => {
-    // Direct match with known NIFs
-    if (code === vn_contrib || code === contribuinte) return true;
-    // Date pattern
+    if (code === vn_contrib) return true;
+    if (code === contribuinte) return true;
     if (/^\d{4}-\d{2}-\d{2}$/.test(code)) return true;
-    // Portuguese NIF pattern check
-    if (KNOWN_NIF_PATTERNS.some(p => p.test(code))) return true;
-    // Fiscal zone context
+    // Portuguese NIF pattern: starts with 1,2,5,6,8,9 and is exactly 9 digits
+    if (/^[125689]\d{8}$/.test(code)) return true;
     const lower = context.toLowerCase();
-    if (FISCAL_ZONE_KEYWORDS.some(k => lower.includes(k))) return true;
+    const fiscalKeywords = ["contribuinte", "nif", "vat", "n.º contrib", "v/n", "cliente", "telefone", "telemóvel", "fax", "email", "código postal", "capital social", "matrícula"];
+    if (fiscalKeywords.some(k => lower.includes(k))) return true;
     return false;
   };
 
-  // Group tokens into lines by Y coordinate (tolerance 5pt)
+  // Group tokens into visual lines
   const lines = new Map<number, Tok[]>();
   for (const t of tokens) {
     const key = Math.round(t.y / 5) * 5;
@@ -254,7 +299,7 @@ export async function extractFromPdf(file: File): Promise<ExtractedData> {
     .sort((a, b) => b[0] - a[0])
     .map(([, toks]) => toks.sort((a, b) => a.x - b.x));
 
-  // Find the header line
+  // Find the header line with "Artigo" + "Descrição" + "Qtd"
   let headerIdx = -1;
   let xArtigo = 0, xDesc = 0, xQtd = 0, xUn = 0;
   for (let i = 0; i < sortedLines.length; i++) {
@@ -273,14 +318,15 @@ export async function extractFromPdf(file: File): Promise<ExtractedData> {
   }
 
   if (headerIdx >= 0 && (!xArtigo || !xDesc || !xQtd || !xUn)) {
-    headerIdx = -1;
+    // Try with relaxed criteria — at least artigo and desc
+    if (!xArtigo || !xDesc) headerIdx = -1;
   }
 
   const items: ChecklistItem[] = [];
   const seen = new Set<string>();
 
   if (headerIdx >= 0) {
-    validations.push({ field: "tabela", status: "ok", message: `Cabeçalho encontrado na linha ${headerIdx}` });
+    validations.push({ field: "tabela", status: "ok", message: `Cabeçalho da tabela encontrado na linha visual ${headerIdx}` });
 
     for (let i = headerIdx + 1; i < sortedLines.length; i++) {
       const line = sortedLines[i];
@@ -290,10 +336,11 @@ export async function extractFromPdf(file: File): Promise<ExtractedData> {
 
       if (STOP_TOKENS.some((t) => lower.includes(t))) break;
 
+      // Article line starts with a numeric code (4+ digits)
       const first = line[0].str.trim();
       if (!/^\d{4,}$/.test(first)) continue;
       if (isForbidden(first, text)) {
-        validations.push({ field: "artigo", status: "warning", message: `Ignorado código fiscal: ${first}` });
+        validations.push({ field: "artigo", status: "warning", message: `Código fiscal ignorado: ${first} (NIF/VAT)` });
         continue;
       }
 
@@ -303,15 +350,20 @@ export async function extractFromPdf(file: File): Promise<ExtractedData> {
       let un = "";
 
       for (const t of line.slice(1)) {
-        if (xUn && t.x >= xUn - 5) un += t.str;
-        else if (xQtd && t.x >= xQtd - 30) qtd += t.str;
-        else descricao += (descricao ? " " : "") + t.str;
+        const tx = t.x;
+        if (xUn && tx >= xUn - 10) {
+          un += t.str;
+        } else if (xQtd && tx >= xQtd - 35) {
+          qtd += t.str;
+        } else {
+          descricao += (descricao ? " " : "") + t.str;
+        }
       }
 
       const desc = descricao.trim();
-      const qty = qtd.trim();
+      const qty = qtd.trim().replace(/\s/g, "");
       const unit = un.trim().toUpperCase();
-      const qtyOk = /^\d{1,5}(?:[.,]\d{1,3})?$/.test(qty);
+      const qtyOk = /^\d{1,6}(?:[.,]\d{1,3})?$/.test(qty);
       const unitOk = UNIT_SET.has(unit);
       const descOk = desc.length > 2 && !HEADER_NOISE.some((t) => desc.toLowerCase().includes(t));
 
@@ -322,22 +374,21 @@ export async function extractFromPdf(file: File): Promise<ExtractedData> {
       seen.add(dedupeKey);
 
       items.push({ artigo, descricao: desc, quantidade: qty, unidade: unit, checked: false });
+      validations.push({ field: "artigo", status: "ok", message: `✓ ${artigo} — ${desc} (${qty} ${unit})` });
     }
   }
 
-  // Fallback regex
+  // Fallback regex extraction
   if (items.length === 0) {
-    validations.push({ field: "tabela", status: "warning", message: "Fallback: extração por regex" });
+    validations.push({ field: "tabela", status: "warning", message: "Fallback: extração por regex no texto completo" });
     const lineRegex =
-      /(\d{6,})\s+((?:(?!\d{6,})[A-Za-zÀ-ÿ0-9.,\-/()\s])+?)\s+(\d{1,3}(?:[.,]\d{1,3})?)\s+(M2|M3|ML|UN|KG|LT|L|PC|CX|SC|UND|MT|M|TON|PAL)\b/gi;
+      /(\d{6,})\s+((?:(?!\d{6,})[A-Za-zÀ-ÿ0-9.,\-/()\s])+?)\s+(\d{1,6}(?:[.,]\d{1,3})?)\s+(M2|M3|ML|UN|KG|LT|L|PC|CX|SC|UND|MT|M|TON|PAL)\b/gi;
     let m: RegExpExecArray | null;
     while ((m = lineRegex.exec(fullText)) !== null) {
       if (isForbidden(m[1], m[0])) continue;
       const desc = m[2].replace(/\s+/g, " ").trim();
       const qty = m[3];
       const unit = m[4].toUpperCase();
-      if (!/^\d{1,5}(?:[.,]\d{1,3})?$/.test(qty)) continue;
-      if (!UNIT_SET.has(unit)) continue;
       if (desc.length <= 2 || HEADER_NOISE.some((t) => desc.toLowerCase().includes(t))) continue;
 
       const dedupeKey = `${m[1]}|${qty}|${unit}|${desc}`;
@@ -348,7 +399,7 @@ export async function extractFromPdf(file: File): Promise<ExtractedData> {
     }
   }
 
-  // QR Code extraction
+  // ──── QR CODE ────
   let qr_at_code = "";
   let qr_raw = "";
   let qr_confidence = 0;
@@ -361,25 +412,34 @@ export async function extractFromPdf(file: File): Promise<ExtractedData> {
       qr_at_code = best.atCode;
       qr_raw = best.raw;
       qr_confidence = best.confidence;
-      validations.push({ field: "qr_code", status: "ok", message: `QR Code lido (confiança: ${qr_confidence}%)` });
+      validations.push({ field: "qr_code", status: "ok", message: `QR Code lido com ${qr_confidence}% confiança` });
+
+      // If QR code has an AT code and we didn't find one in text, use QR's
+      if (qr_at_code && !chave_at) {
+        chave_at = qr_at_code;
+        chave_at_needs_validation = false;
+        validations.push({ field: "chave_at", status: "ok", message: `Chave AT obtida do QR Code: ${chave_at}` });
+      }
     }
   } catch {
-    validations.push({ field: "qr_code", status: "warning", message: "QR Code: biblioteca não disponível" });
+    validations.push({ field: "qr_code", status: "warning", message: "QR Code: biblioteca jsqr não disponível" });
   }
 
-  // Validations summary
-  if (items.length > 0) validations.push({ field: "artigos", status: "ok", message: `${items.length} artigos extraídos` });
-  else validations.push({ field: "artigos", status: "error", message: "Nenhum artigo encontrado" });
-  if (chave_at) validations.push({ field: "chave_at", status: "ok", message: `Chave AT: ${chave_at}` });
-  if (data_documento) validations.push({ field: "data", status: "ok", message: `Data: ${data_documento}` });
+  // Final validation summary
+  if (items.length > 0) {
+    validations.push({ field: "resultado", status: "ok", message: `${items.length} artigos extraídos com sucesso` });
+  } else {
+    validations.push({ field: "resultado", status: "error", message: "Nenhum artigo encontrado no documento" });
+  }
 
   return {
-    chave_at: qr_at_code || chave_at,
+    chave_at,
     atcud,
     numero_guia,
     tipo_documento,
     data_documento,
     vn_contrib,
+    requisicao,
     data_carga,
     hora_carga,
     emissor,
@@ -391,5 +451,6 @@ export async function extractFromPdf(file: File): Promise<ExtractedData> {
     qr_confidence,
     validations,
     processing_time: Date.now() - startTime,
+    chave_at_needs_validation,
   };
 }

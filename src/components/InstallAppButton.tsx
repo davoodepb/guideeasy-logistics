@@ -1,5 +1,5 @@
-﻿import { useState, useEffect } from "react";
-import { Download, Share, MoreVertical } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Download, Share, X, Smartphone, Monitor } from "lucide-react";
 import { toast } from "sonner";
 
 export function InstallAppButton({ variant = "icon" }: { variant?: "icon" | "full" }) {
@@ -7,93 +7,211 @@ export function InstallAppButton({ variant = "icon" }: { variant?: "icon" | "ful
   const [isStandalone, setIsStandalone] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [isAndroid, setIsAndroid] = useState(false);
+  const [showIOSModal, setShowIOSModal] = useState(false);
+  const [installing, setInstalling] = useState(false);
 
   useEffect(() => {
-    const isStandaloneMode = window.matchMedia("(display-mode: standalone)").matches || (window.navigator as any).standalone;
-    setIsStandalone(isStandaloneMode);
+    // Check if already installed
+    const standalone =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      (window.navigator as any).standalone === true;
+    setIsStandalone(standalone);
 
     const ua = navigator.userAgent;
     setIsIOS(/iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream);
     setIsAndroid(/android/i.test(ua));
 
-    // Try to grab globally stashed prompt if it fired early
+    // Capture the deferred prompt event
+    const capturePrompt = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+      (window as any).deferredPrompt = e;
+      console.log("[PWA] Install prompt captured!");
+    };
+
+    // Check if prompt was already captured globally
     if ((window as any).deferredPrompt) {
       setInstallPrompt((window as any).deferredPrompt);
     }
 
-    const handler = (e: Event) => {
-      e.preventDefault();
-      setInstallPrompt(e);
-      (window as any).deferredPrompt = e;
+    window.addEventListener("beforeinstallprompt", capturePrompt);
+
+    // Listen for successful installation
+    window.addEventListener("appinstalled", () => {
+      setInstallPrompt(null);
+      (window as any).deferredPrompt = null;
+      setIsStandalone(true);
+      toast.success("✅ App instalada com sucesso! Pode fechar o browser.");
+    });
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", capturePrompt);
     };
-    
-    window.addEventListener("beforeinstallprompt", handler);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
-  if (isStandalone) return null;
+  const handleInstall = useCallback(async () => {
+    const prompt = installPrompt || (window as any).deferredPrompt;
 
-  async function handleInstall() {
-    const promptEvent = installPrompt || (window as any).deferredPrompt;
-    
-    if (promptEvent) {
-      promptEvent.prompt();
-      const result = await promptEvent.userChoice;
-      if (result.outcome === "accepted") {
-        toast.success("App instalada com sucesso!");
+    if (prompt) {
+      // REAL install prompt available — trigger it
+      setInstalling(true);
+      try {
+        await prompt.prompt();
+        const { outcome } = await prompt.userChoice;
+        if (outcome === "accepted") {
+          toast.success("✅ App instalada com sucesso!");
+          setInstallPrompt(null);
+          (window as any).deferredPrompt = null;
+        } else {
+          toast("Instalação cancelada. Pode instalar mais tarde.");
+        }
+      } catch (err) {
+        console.error("[PWA] Install error:", err);
+        // Prompt was already used, clear it
         setInstallPrompt(null);
         (window as any).deferredPrompt = null;
+        showFallbackInstructions();
+      } finally {
+        setInstalling(false);
       }
     } else if (isIOS) {
-      toast(
-        <div className="flex flex-col gap-2">
-          <p className="font-bold">Instalar no ecrã principal (iOS)</p>
-          <div className="flex items-center gap-2 text-sm">1. Toque no ícone de partilha <Share className="size-4 border rounded p-0.5" /> abaixo.</div>
-          <div className="flex items-center gap-2 text-sm">2. Escolha "Adicionar ao Ecrã Principal".</div>
-        </div>, 
-        { duration: 10000 }
-      );
+      setShowIOSModal(true);
     } else if (isAndroid) {
       toast(
-        <div className="flex flex-col gap-2">
-          <p className="font-bold">Instalação Manual (Android)</p>
-          <div className="flex items-center gap-2 text-sm">1. Toque no menu do browser <MoreVertical className="size-4" /> (3 pontos).</div>
-          <div className="flex items-center gap-2 text-sm">2. Escolha "Instalar aplicação" ou "Adicionar ao ecrã principal".</div>
-          <p className="text-xs mt-1 text-muted-foreground">Se abriu a partir do WhatsApp/Instagram, copie o link e abra no Google Chrome de forma nativa.</p>
-        </div>, 
-        { duration: 12000 }
+        <div className="flex flex-col gap-3">
+          <p className="font-bold text-base">📲 Instalar no Android</p>
+          <div className="space-y-2 text-sm">
+            <p><strong>1.</strong> Toque nos <strong>3 pontos ⋮</strong> no canto superior direito</p>
+            <p><strong>2.</strong> Toque em <strong>"Instalar aplicação"</strong></p>
+            <p><strong>3.</strong> Confirme tocando em <strong>"Instalar"</strong></p>
+          </div>
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-2 text-xs text-amber-700">
+            ⚠️ Se abriu pelo WhatsApp ou Instagram, copie o link e abra no <strong>Chrome</strong>.
+          </div>
+        </div>,
+        { duration: 15000 },
       );
     } else {
-      toast(
-        <div className="flex flex-col gap-2">
-          <p className="font-bold">Instalar App no Computador</p>
-          <p className="text-sm">Procure o ícone de instalação (computador com uma seta) na barra de endereço do Chrome/Edge, perto da estrela de favoritos.</p>
-        </div>, 
-        { duration: 8000 }
-      );
+      showFallbackInstructions();
     }
-  }
+  }, [installPrompt, isIOS, isAndroid]);
 
-  if (variant === "full") {
-    return (
-      <button
-        onClick={handleInstall}
-        className="mt-4 w-full h-12 rounded-xl bg-secondary/20 border-2 border-secondary text-primary-foreground font-semibold flex items-center justify-center gap-2 hover:bg-secondary/30 transition shadow-sm"
-      >
-        <Download className="size-5" />
-        Instalar App no Telemóvel
-      </button>
+  function showFallbackInstructions() {
+    const isChrome = /chrome/i.test(navigator.userAgent) && !/edg/i.test(navigator.userAgent);
+    const isEdge = /edg/i.test(navigator.userAgent);
+    const browser = isEdge ? "Edge" : isChrome ? "Chrome" : "browser";
+
+    toast(
+      <div className="flex flex-col gap-3">
+        <p className="font-bold text-base">💻 Instalar no {browser}</p>
+        <div className="space-y-2 text-sm">
+          <p><strong>1.</strong> Na barra de endereço, procure o ícone <strong>⊕</strong> ou <strong>📥</strong></p>
+          <p><strong>2.</strong> Clique nesse ícone e escolha <strong>"Instalar"</strong></p>
+          <p><strong>3.</strong> A app abre como programa independente</p>
+        </div>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 text-xs text-blue-700">
+          💡 Se não vê o ícone: Menu ⋮ → <strong>"Instalar Prudêncio Checklist"</strong>
+        </div>
+      </div>,
+      { duration: 15000 },
     );
   }
 
+  if (isStandalone) return null;
+
+  const hasPrompt = !!(installPrompt || (window as any).deferredPrompt);
+  const label = hasPrompt
+    ? "📥 Instalar Aplicação"
+    : isIOS
+      ? "📲 Instalar App (iPhone)"
+      : isAndroid
+        ? "📲 Instalar App (Android)"
+        : "💻 Instalar App (Desktop)";
+
   return (
-    <button
-      onClick={handleInstall}
-      className="size-10 rounded-full bg-secondary text-secondary-foreground shadow-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-all"
-      aria-label="Instalar App"
-      title="Instalar App"
-    >
-      <Download className="size-5" />
-    </button>
+    <>
+      {variant === "full" ? (
+        <button
+          onClick={handleInstall}
+          disabled={installing}
+          className={`w-full h-14 rounded-xl font-bold text-base flex items-center justify-center gap-3 transition shadow-lg active:scale-[0.98] ${
+            hasPrompt
+              ? "bg-gradient-to-r from-green-600 to-emerald-500 text-white shadow-green-500/25 hover:from-green-500 hover:to-emerald-400"
+              : "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-blue-500/25 hover:from-blue-500 hover:to-indigo-500"
+          } disabled:opacity-60`}
+        >
+          {installing ? (
+            <span className="size-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <Download className="size-5" />
+          )}
+          {label}
+        </button>
+      ) : (
+        <button
+          onClick={handleInstall}
+          disabled={installing}
+          className={`size-12 rounded-full shadow-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-all ${
+            hasPrompt
+              ? "bg-gradient-to-br from-green-600 to-emerald-500 text-white shadow-green-500/30"
+              : "bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-blue-500/30"
+          }`}
+          aria-label="Instalar App"
+          title={label}
+        >
+          <Download className="size-5" />
+        </button>
+      )}
+
+      {/* iOS Install Modal */}
+      {showIOSModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-end sm:items-center justify-center p-4" onClick={() => setShowIOSModal(false)}>
+          <div className="bg-white rounded-3xl w-full max-w-md p-6 space-y-5 animate-slide-up" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-900">📲 Instalar no iPhone</h2>
+              <button onClick={() => setShowIOSModal(false)} className="size-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition">
+                <X className="size-4 text-gray-600" />
+              </button>
+            </div>
+
+            <div className="space-y-5">
+              <IOSStep num={1}>
+                Toque no ícone de <strong>Partilhar</strong>{" "}
+                <Share className="size-5 inline text-blue-600 align-text-bottom" />{" "}
+                na barra inferior do Safari
+              </IOSStep>
+
+              <IOSStep num={2}>
+                Deslize para baixo e toque em{" "}
+                <strong className="text-blue-600">"Adicionar ao Ecrã Principal"</strong>
+              </IOSStep>
+
+              <IOSStep num={3}>
+                Toque em <strong className="text-green-600">"Adicionar"</strong> no canto superior direito
+              </IOSStep>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-800">
+              <strong>⚠️ Importante:</strong> Use o <strong>Safari</strong> para instalar. Outros browsers (Chrome, Firefox) não suportam PWA no iOS.
+            </div>
+
+            <button onClick={() => setShowIOSModal(false)} className="w-full h-13 rounded-xl bg-blue-600 text-white font-bold text-base transition hover:bg-blue-500 active:scale-[0.98]">
+              Entendido ✓
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function IOSStep({ num, children }: { num: number; children: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-4">
+      <div className="size-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-lg shrink-0 shadow-md">
+        {num}
+      </div>
+      <p className="text-base text-gray-700 pt-1.5">{children}</p>
+    </div>
   );
 }

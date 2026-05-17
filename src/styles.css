@@ -154,6 +154,11 @@
   to { opacity: 1; transform: scale(1); }
 }
 
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(100px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 @keyframes pulse-glow {
   0%, 100% { box-shadow: 0 0 15px rgba(59, 130, 246, 0.3); }
   50% { box-shadow: 0 0 30px rgba(59, 130, 246, 0.5); }
@@ -169,6 +174,10 @@
 
 .animate-scale-in {
   animation: scaleIn 0.3s ease-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.4s ease-out;
 }
 
 /* ═══ VALIDATION BADGES ═══ */

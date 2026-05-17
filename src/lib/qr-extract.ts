@@ -1,13 +1,9 @@
 /**
  * QR Code extractor from PDF pages.
+ * Renders each page at HIGH resolution and scans with multiple strategies.
  *
- * Renders each page of a PDF to an off-screen canvas and scans for QR codes.
- * Extracts the AT code from the QR code payload.
- *
- * Portuguese invoice QR codes typically encode a string like:
- *   A:123456789*B:901059978*C:PT*D:GT*E:N*F:20260505*G:GT GT.2026/67*H:ATCUD-123*I1:PT*...
- *   The "H" field often contains the ATCUD / AT key.
- *   Or sometimes a direct URL with the AT code.
+ * Portuguese fiscal QR format:
+ *   A:NIF_EMITENTE*B:NIF_ADQUIRENTE*C:PT*D:GT*E:N*F:20260505*G:GT GT.2026/67*H:ATCUD*...*Q:HASH*R:CERT
  */
 
 export type QRResult = {
@@ -22,94 +18,86 @@ export type QRResult = {
   confidence: number;
 };
 
-/**
- * Attempt to extract QR codes from all pages of a loaded PDF document.
- * Returns array of QR results found.
- */
 export async function extractQRFromPdf(
-  pdfDoc: any, // PDFDocumentProxy
+  pdfDoc: any,
   pdfjs: any,
 ): Promise<QRResult[]> {
   const results: QRResult[] = [];
 
-  // Dynamically import jsQR — if not installed, return empty
   let jsQR: any;
   try {
     const mod = await import("jsqr");
     jsQR = mod.default || mod;
   } catch {
-    console.warn("[QR] jsqr not installed — skipping QR extraction");
+    console.warn("[QR] jsqr not installed — skipping");
     return results;
   }
 
   for (let p = 1; p <= pdfDoc.numPages; p++) {
     try {
       const page = await pdfDoc.getPage(p);
-      const viewport = page.getViewport({ scale: 2.0 }); // Higher scale for better QR reading
 
-      // Create off-screen canvas
-      const canvas = document.createElement("canvas");
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) continue;
+      // Try multiple scales — higher scale = more detail for QR reading
+      const scales = [4.0, 3.0, 2.5, 2.0];
+      let found = false;
 
-      await page.render({ canvasContext: ctx, viewport }).promise;
+      for (const scale of scales) {
+        if (found) break;
+        const viewport = page.getViewport({ scale });
 
-      // Get image data for QR scanning
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const code = jsQR(imageData.data, imageData.width, imageData.height, {
-        inversionAttempts: "dontInvert",
-      });
+        const canvas = document.createElement("canvas");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) continue;
 
-      if (code && code.data) {
-        const parsed = parsePortugueseQR(code.data);
-        results.push(parsed);
-      }
+        await page.render({ canvasContext: ctx, viewport }).promise;
 
-      // Also try scanning specific regions (bottom-right, bottom-left)
-      // QR codes in Portuguese invoices are often in the bottom area
-      if (!code) {
-        const regions = [
-          // Bottom-right quadrant
-          {
-            x: Math.floor(canvas.width * 0.5),
-            y: Math.floor(canvas.height * 0.5),
-            w: Math.floor(canvas.width * 0.5),
-            h: Math.floor(canvas.height * 0.5),
-          },
-          // Bottom-left quadrant
-          {
-            x: 0,
-            y: Math.floor(canvas.height * 0.5),
-            w: Math.floor(canvas.width * 0.5),
-            h: Math.floor(canvas.height * 0.5),
-          },
-          // Top-right quadrant
-          {
-            x: Math.floor(canvas.width * 0.5),
-            y: 0,
-            w: Math.floor(canvas.width * 0.5),
-            h: Math.floor(canvas.height * 0.5),
-          },
-        ];
+        // Strategy 1: Scan full page
+        const fullData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        let code = jsQR(fullData.data, fullData.width, fullData.height, {
+          inversionAttempts: "attemptBoth",
+        });
 
-        for (const region of regions) {
-          const regionData = ctx.getImageData(region.x, region.y, region.w, region.h);
-          const regionCode = jsQR(regionData.data, regionData.width, regionData.height, {
-            inversionAttempts: "attemptBoth",
-          });
-          if (regionCode && regionCode.data) {
-            const parsed = parsePortugueseQR(regionCode.data);
+        if (code && code.data && code.data.length > 10) {
+          const parsed = parsePortugueseQR(code.data);
+          if (parsed.confidence > 0) {
             results.push(parsed);
-            break; // Found one, stop scanning regions
+            found = true;
+            canvas.width = 0;
+            canvas.height = 0;
+            break;
           }
         }
-      }
 
-      // Clean up
-      canvas.width = 0;
-      canvas.height = 0;
+        // Strategy 2: Scan bottom-right corner (most common QR location in Portuguese invoices)
+        const regions = [
+          { x: Math.floor(canvas.width * 0.55), y: Math.floor(canvas.height * 0.6), w: Math.floor(canvas.width * 0.45), h: Math.floor(canvas.height * 0.4) },
+          { x: Math.floor(canvas.width * 0.6), y: Math.floor(canvas.height * 0.65), w: Math.floor(canvas.width * 0.4), h: Math.floor(canvas.height * 0.35) },
+          { x: Math.floor(canvas.width * 0.5), y: Math.floor(canvas.height * 0.5), w: Math.floor(canvas.width * 0.5), h: Math.floor(canvas.height * 0.5) },
+          { x: 0, y: Math.floor(canvas.height * 0.6), w: Math.floor(canvas.width * 0.5), h: Math.floor(canvas.height * 0.4) },
+        ];
+
+        for (const r of regions) {
+          if (found) break;
+          try {
+            const regionData = ctx.getImageData(r.x, r.y, r.w, r.h);
+            const regionCode = jsQR(regionData.data, regionData.width, regionData.height, {
+              inversionAttempts: "attemptBoth",
+            });
+            if (regionCode && regionCode.data && regionCode.data.length > 10) {
+              const parsed = parsePortugueseQR(regionCode.data);
+              if (parsed.confidence > 0) {
+                results.push(parsed);
+                found = true;
+              }
+            }
+          } catch {}
+        }
+
+        canvas.width = 0;
+        canvas.height = 0;
+      }
     } catch (err) {
       console.warn(`[QR] Error scanning page ${p}:`, err);
     }
@@ -119,9 +107,8 @@ export async function extractQRFromPdf(
 }
 
 /**
- * Parse a Portuguese fiscal QR code string.
- *
- * Format: A:NIF_EMITENTE*B:NIF_ADQUIRENTE*C:PAIS*D:TIPO*E:ESTADO*F:DATA*G:ID*H:ATCUD*...
+ * Parse Portuguese fiscal QR code string.
+ * Format: A:NIF*B:NIF*C:PT*D:GT*E:N*F:YYYYMMDD*G:DOC_ID*H:ATCUD*I1:PT*...*N:IVA*O:TOTAL*Q:HASH*R:CERT
  */
 function parsePortugueseQR(raw: string): QRResult {
   const result: QRResult = {
@@ -136,7 +123,11 @@ function parsePortugueseQR(raw: string): QRResult {
     confidence: 0,
   };
 
-  // Try standard Portuguese QR format (field:value separated by *)
+  // Validate it looks like a Portuguese fiscal QR (must have A: and * separators)
+  if (!raw.includes("*") || !raw.includes(":")) {
+    return result;
+  }
+
   const fields = raw.split("*");
   let matchCount = 0;
 
@@ -145,6 +136,8 @@ function parsePortugueseQR(raw: string): QRResult {
     if (colonIdx < 0) continue;
     const key = field.substring(0, colonIdx).trim().toUpperCase();
     const value = field.substring(colonIdx + 1).trim();
+
+    if (!value) continue;
 
     switch (key) {
       case "A":
@@ -155,12 +148,19 @@ function parsePortugueseQR(raw: string): QRResult {
         result.nif_adquirente = value;
         matchCount++;
         break;
+      case "C":
+        // Country code (PT)
+        if (value === "PT") matchCount++;
+        break;
       case "D":
         result.tipo_documento = value;
         matchCount++;
         break;
+      case "E":
+        // Estado (N = Normal, A = Anulado)
+        matchCount++;
+        break;
       case "F":
-        // Date format: YYYYMMDD -> YYYY-MM-DD
         if (/^\d{8}$/.test(value)) {
           result.data_documento = `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`;
         } else {
@@ -176,38 +176,26 @@ function parsePortugueseQR(raw: string): QRResult {
         result.atcud = value;
         matchCount++;
         break;
-      case "I1":
-      case "I":
-        // Sometimes the AT validation code is here
-        break;
       case "Q":
-        // Hash / AT code in some formats
+        // Hash — this is the AT validation hash
         result.atCode = value;
         matchCount++;
         break;
       case "R":
         // Certificate number
+        matchCount++;
         break;
     }
   }
 
-  // If we couldn't find AT code in Q field, try to extract from ATCUD
+  // If no AT code from Q field, try from ATCUD
   if (!result.atCode && result.atcud) {
-    // ATCUD format is often: VALIDATION_CODE-SEQUENCE
-    const parts = result.atcud.split("-");
-    if (parts.length >= 1) {
-      result.atCode = parts[0];
-    }
+    result.atCode = result.atcud;
   }
 
-  // If the raw data is a URL, try to extract AT code from it
-  if (!result.atCode && raw.startsWith("http")) {
-    const urlMatch = raw.match(/[?&](?:at|code|chave)=([A-Z0-9]+)/i);
-    if (urlMatch) result.atCode = urlMatch[1];
-  }
-
-  // Calculate confidence
-  result.confidence = Math.min(100, Math.round((matchCount / 6) * 100));
+  // Calculate confidence based on how many standard fields were found
+  // A valid Portuguese fiscal QR should have at least A, B, D, F, G, H fields
+  result.confidence = Math.min(100, Math.round((matchCount / 8) * 100));
 
   return result;
 }

@@ -106,6 +106,31 @@ export async function updateChecklistStore(id: string, patch: Partial<Checklist>
   fbUpdate(id, patch).catch(() => {});
 }
 
+/** Delete a checklist and all its items from Supabase + Firebase */
+export async function deleteChecklistStore(id: string): Promise<void> {
+  // Delete items first (foreign key)
+  await supabase.from("checklist_items").delete().eq("checklist_id", id);
+  // Delete checklist
+  const { error } = await supabase.from("checklists").delete().eq("id", id);
+  if (error) throw error;
+  // Firebase mirror cleanup (best-effort)
+  try {
+    const { ref, remove } = await import("firebase/database");
+    const { db } = await import("./firebase");
+    await remove(ref(db, `checklists/${id}`));
+  } catch {}
+}
+
+/** Delete ALL checklists */
+export async function deleteAllChecklistsStore(): Promise<void> {
+  const { data } = await supabase.from("checklists").select("id");
+  if (data) {
+    for (const row of data) {
+      await deleteChecklistStore(row.id);
+    }
+  }
+}
+
 export async function logUserStore(name: string, phone: string) {
   await supabase
     .from("app_users")
