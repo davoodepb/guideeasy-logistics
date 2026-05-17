@@ -53,6 +53,7 @@
     "embla-carousel-react": "^8.6.0",
     "firebase": "^11.10.0",
     "input-otp": "^1.4.2",
+    "jsqr": "^1.4.0",
     "lucide-react": "^0.575.0",
     "pdfjs-dist": "^4.10.38",
     "react": "^19.2.0",

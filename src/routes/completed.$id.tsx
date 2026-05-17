@@ -13,6 +13,8 @@ import {
   User,
   Hash,
   FileText,
+  Package,
+  BarChart3,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -44,59 +46,96 @@ function CompletedPage() {
       </main>
     );
 
+  const totalQty = c.items
+    .reduce(
+      (s, i) => s + parseFloat(i.quantidade.replace(",", ".") || "0"),
+      0,
+    )
+    .toFixed(1);
+
   function shareWhatsApp() {
     if (!c) return;
     const url = `${window.location.origin}/completed/${id}`;
     const lines = c.items
-      .map((i) => `• ${i.artigo} | ${i.quantidade} ${i.unidade} | ${i.descricao}`)
+      .map(
+        (i) =>
+          `${i.checked ? "✅" : "⬜"} ${i.artigo} | ${i.quantidade} ${i.unidade} | ${i.descricao}`,
+      )
       .join("\n");
     const text =
-      `✅ *Checklist concluída*\n\n` +
-      `Data: ${c.data_documento || ""}\n` +
-      `Chave AT: ${c.codigo_at || ""}\n` +
-      `Responsável: ${c.responsavel || ""}\n\n` +
-      `Artigos:\n${lines}\n\n` +
-      `Abrir: ${url}`;
+      `✅ *Checklist concluída — Prudêncio*\n\n` +
+      `📅 Data: ${c.data_documento || "—"}\n` +
+      `🔑 Chave AT: ${c.codigo_at || "—"}\n` +
+      `📄 Guia: ${c.numero_guia || "—"}\n` +
+      `👤 Responsável: ${c.responsavel || "—"}\n\n` +
+      `📦 *${c.items.length} Artigos* (Qtd Total: ${totalQty}):\n${lines}\n\n` +
+      `🔗 ${url}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
   }
 
   function exportCSV() {
     if (!c) return;
-    const headers = ["Artigo", "Descrição", "Quantidade", "Unidade", "Confirmado"];
+    const headers = [
+      "Data",
+      "Artigo",
+      "Chave AT",
+      "Descrição",
+      "Quantidade",
+      "Unidade",
+      "Confirmado",
+    ];
     const rows = c.items.map((i) =>
-      [i.artigo, `"${i.descricao}"`, i.quantidade, i.unidade, i.checked ? "Sim" : "Não"].join(";"),
+      [
+        c.data_documento || "",
+        i.artigo,
+        c.codigo_at || "",
+        `"${i.descricao}"`,
+        i.quantidade,
+        i.unidade,
+        i.checked ? "Sim" : "Não",
+      ].join(";"),
     );
     const csv = [headers.join(";"), ...rows].join("\n");
-    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob(["\ufeff" + csv], {
+      type: "text/csv;charset=utf-8;",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = `checklist_${c.codigo_at || c.id}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success("CSV exportado (compatível com Access)");
+    toast.success("CSV exportado");
   }
+
+  const confirmed = c.items.filter((i) => i.checked).length;
 
   return (
     <main className="min-h-[100dvh] bg-background pb-24">
-      <header className="bg-primary text-primary-foreground px-5 pt-6 pb-8 rounded-b-3xl">
-        <Link to="/dashboard" className="inline-flex items-center gap-2 text-sm opacity-80">
+      {/* Header */}
+      <header className="bg-gradient-to-br from-primary via-primary to-[oklch(0.22_0.07_255)] text-primary-foreground px-5 pt-6 pb-8 rounded-b-3xl shadow-lg">
+        <Link
+          to="/dashboard"
+          className="inline-flex items-center gap-2 text-sm opacity-80 hover:opacity-100 transition"
+        >
           <ArrowLeft className="size-4" /> Dashboard
         </Link>
         <div className="mt-3 flex items-center gap-3">
-          <div className="size-12 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center">
+          <div className="size-12 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center shadow-lg animate-scale-in">
             <CheckCircle2 className="size-7" />
           </div>
           <div>
-            <h1 className="text-xl font-bold">Concluída</h1>
-            <p className="text-sm opacity-80 font-mono">{c.numero_guia || c.codigo_at}</p>
+            <h1 className="text-xl font-bold">Concluída ✓</h1>
+            <p className="text-sm opacity-80 font-mono">
+              {c.numero_guia || c.codigo_at}
+            </p>
           </div>
         </div>
       </header>
 
       <section className="px-5 mt-5 space-y-4">
         {/* Summary Card */}
-        <div className="bg-card rounded-2xl border p-4 grid grid-cols-2 gap-3 text-sm">
+        <div className="bg-card rounded-2xl border p-4 grid grid-cols-2 gap-3 text-sm animate-fade-in-up">
           <Field
             icon={<User className="size-4" />}
             label="Responsável"
@@ -105,9 +144,17 @@ function CompletedPage() {
           <Field
             icon={<Calendar className="size-4" />}
             label="Submetida"
-            value={c.submitted_at ? new Date(c.submitted_at).toLocaleString("pt-PT") : "—"}
+            value={
+              c.submitted_at
+                ? new Date(c.submitted_at).toLocaleString("pt-PT")
+                : "—"
+            }
           />
-          <Field icon={<Hash className="size-4" />} label="Código AT" value={c.codigo_at || "—"} />
+          <Field
+            icon={<Hash className="size-4" />}
+            label="Código AT"
+            value={c.codigo_at || "—"}
+          />
           <Field
             icon={<FileText className="size-4" />}
             label="Nº Guia"
@@ -116,7 +163,17 @@ function CompletedPage() {
           <Field
             icon={<CheckCircle2 className="size-4" />}
             label="Confirmados"
-            value={`${c.items.filter((i) => i.checked).length}/${c.items.length}`}
+            value={`${confirmed}/${c.items.length}`}
+          />
+          <Field
+            icon={<BarChart3 className="size-4" />}
+            label="Qtd Total"
+            value={totalQty}
+          />
+          <Field
+            icon={<Calendar className="size-4" />}
+            label="Data Doc."
+            value={c.data_documento || "—"}
           />
           <Field
             icon={<Calendar className="size-4" />}
@@ -127,36 +184,55 @@ function CompletedPage() {
 
         {/* Observações */}
         {c.observacoes_renato && (
-          <Block title="Observações do Renato" body={c.observacoes_renato} accent />
+          <Block
+            title="Observações do Renato"
+            body={c.observacoes_renato}
+            accent
+          />
         )}
         {c.observacoes_colaborador && (
-          <Block title="Observações do Colaborador" body={c.observacoes_colaborador} />
+          <Block
+            title="Observações do Colaborador"
+            body={c.observacoes_colaborador}
+          />
         )}
 
         {/* Artigos */}
         <div className="bg-card rounded-2xl border overflow-hidden">
-          <p className="px-4 py-3 text-xs uppercase tracking-wider font-semibold border-b bg-muted flex items-center gap-2">
-            <span className="size-5 bg-primary text-primary-foreground rounded flex items-center justify-center text-xs">
-              {c.items.length}
-            </span>
-            Artigos
-          </p>
+          <div className="px-4 py-3 bg-muted border-b flex items-center justify-between">
+            <p className="text-xs uppercase tracking-wider font-semibold flex items-center gap-2">
+              <span className="size-6 bg-primary text-primary-foreground rounded-md flex items-center justify-center text-xs font-bold">
+                {c.items.length}
+              </span>
+              Artigos
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Qtd Total: {totalQty}
+            </p>
+          </div>
           <ul className="divide-y">
             {c.items.map((it, i) => (
               <li key={i} className="p-3 flex items-center gap-3">
                 <span
-                  className={`size-6 rounded-full flex items-center justify-center text-xs ${
-                    it.checked ? "bg-secondary text-secondary-foreground" : "bg-muted border"
+                  className={`size-6 rounded-full flex items-center justify-center text-xs shrink-0 ${
+                    it.checked
+                      ? "bg-secondary text-secondary-foreground"
+                      : "bg-muted border"
                   }`}
                 >
                   {it.checked ? "✓" : ""}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm truncate">{it.descricao}</p>
-                  <p className="text-xs text-muted-foreground font-mono">{it.artigo}</p>
+                  <p className="text-sm leading-tight">{it.descricao}</p>
+                  <p className="text-xs text-muted-foreground font-mono flex items-center gap-1">
+                    <Package className="size-3" /> {it.artigo}
+                  </p>
                 </div>
-                <span className="text-sm font-semibold tabular-nums whitespace-nowrap">
-                  {it.quantidade} {it.unidade}
+                <span className="text-sm font-bold tabular-nums whitespace-nowrap">
+                  {it.quantidade}{" "}
+                  <span className="text-xs text-muted-foreground">
+                    {it.unidade}
+                  </span>
                 </span>
               </li>
             ))}
@@ -167,19 +243,19 @@ function CompletedPage() {
         <div className="grid grid-cols-3 gap-3">
           <button
             onClick={() => exportChecklistToExcel(c)}
-            className="h-12 rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2 text-sm"
+            className="h-13 rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2 text-sm shadow hover:shadow-md transition"
           >
             <Download className="size-4" /> Excel
           </button>
           <button
             onClick={exportCSV}
-            className="h-12 rounded-xl bg-primary/80 text-primary-foreground font-semibold flex items-center justify-center gap-2 text-sm"
+            className="h-13 rounded-xl bg-primary/80 text-primary-foreground font-semibold flex items-center justify-center gap-2 text-sm shadow hover:shadow-md transition"
           >
             <FileSpreadsheet className="size-4" /> CSV
           </button>
           <button
             onClick={shareWhatsApp}
-            className="h-12 rounded-xl bg-secondary text-secondary-foreground font-semibold flex items-center justify-center gap-2 text-sm"
+            className="h-13 rounded-xl bg-[#25D366] text-white font-semibold flex items-center justify-center gap-2 text-sm shadow hover:shadow-md transition"
           >
             <MessageCircle className="size-4" /> WhatsApp
           </button>
@@ -189,24 +265,44 @@ function CompletedPage() {
   );
 }
 
-function Field({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function Field({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
   return (
     <div className="flex items-start gap-2">
       <span className="text-muted-foreground mt-0.5 shrink-0">{icon}</span>
       <div>
-        <p className="text-xs uppercase tracking-wider text-muted-foreground">{label}</p>
+        <p className="text-xs uppercase tracking-wider text-muted-foreground">
+          {label}
+        </p>
         <p className="font-medium">{value}</p>
       </div>
     </div>
   );
 }
 
-function Block({ title, body, accent }: { title: string; body: string; accent?: boolean }) {
+function Block({
+  title,
+  body,
+  accent,
+}: {
+  title: string;
+  body: string;
+  accent?: boolean;
+}) {
   return (
     <div
       className={`bg-card rounded-2xl border p-4 ${accent ? "border-l-4 border-l-secondary" : ""}`}
     >
-      <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">{title}</p>
+      <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">
+        {title}
+      </p>
       <p className="text-sm whitespace-pre-wrap">{body}</p>
     </div>
   );

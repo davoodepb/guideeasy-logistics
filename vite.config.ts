@@ -7,7 +7,7 @@ export default defineConfig({
   },
   vite: {
     server: {
-      port: 2343,
+      port: 8433,
       strictPort: false,
     },
   },
