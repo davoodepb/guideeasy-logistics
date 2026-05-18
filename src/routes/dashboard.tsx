@@ -1,8 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { listChecklistsStore as listChecklists, deleteChecklistStore, deleteAllChecklistsStore, type Checklist } from "@/lib/store";
-import { isAuthenticated, clearSession } from "@/lib/session";
+import { listChecklistsStore as listChecklists, deleteChecklistStore, type Checklist } from "@/lib/store";
+import { isAuthenticated, clearSession, getSession } from "@/lib/session";
 import { InstallAppButton } from "@/components/InstallAppButton";
+import { ClearAllButton } from "@/components/ClearAllButton";
 import { toast } from "sonner";
 import {
   Upload, ClipboardList, CheckCircle2, LogOut, Clock, Shield,
@@ -21,9 +22,9 @@ function Dashboard() {
   const [items, setItems] = useState<Checklist[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [showDeleteAll, setShowDeleteAll] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const sessionName = getSession()?.name ?? "";
 
   function loadData() {
     setLoading(true);
@@ -49,19 +50,7 @@ function Dashboard() {
     }
   }
 
-  async function handleDeleteAll() {
-    setDeleting(true);
-    try {
-      await deleteAllChecklistsStore();
-      setItems([]);
-      toast.success("🧹 Todos os dados foram limpos");
-    } catch (e: unknown) {
-      toast.error("Erro: " + (e instanceof Error ? e.message : String(e)));
-    } finally {
-      setDeleting(false);
-      setShowDeleteAll(false);
-    }
-  }
+
 
   const pendentes = items.filter((i) => i.status === "pendente");
   const concluidas = items.filter((i) => i.status === "concluida");
@@ -116,15 +105,13 @@ function Dashboard() {
         <InstallAppButton variant="full" />
       </section>
 
-      {/* Clean all data */}
-      {items.length > 0 && (
-        <section className="px-5 mt-4">
-          <button onClick={() => setShowDeleteAll(true)}
-            className="w-full h-11 rounded-xl bg-red-50 border border-red-200 text-red-600 font-semibold flex items-center justify-center gap-2 text-sm hover:bg-red-100 transition">
-            <Trash2 className="size-4" /> 🧹 Limpar Todos os Dados ({items.length})
-          </button>
-        </section>
-      )}
+      {/* Clean all data — só o chef vê este botão (3 camadas de segurança) */}
+      <section className="px-5 mt-4">
+        <ClearAllButton
+          nomeUtilizador={sessionName}
+          onClearComplete={() => listChecklists().then(setItems)}
+        />
+      </section>
 
       {/* Search and History */}
       <section className="px-5 mt-8">
@@ -253,32 +240,7 @@ function Dashboard() {
         </div>
       )}
 
-      {/* ═══ DELETE ALL CONFIRMATION MODAL ═══ */}
-      {showDeleteAll && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-5" onClick={() => setShowDeleteAll(false)}>
-          <div className="bg-card rounded-2xl w-full max-w-sm p-6 shadow-2xl border animate-scale-in" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold flex items-center gap-2">
-                <Trash2 className="size-5 text-red-500" /> Limpar Todos os Dados
-              </h3>
-              <button onClick={() => setShowDeleteAll(false)} className="size-8 rounded-full bg-muted flex items-center justify-center">
-                <X className="size-4" />
-              </button>
-            </div>
-            <p className="text-sm text-muted-foreground mb-1">Tem a certeza que deseja apagar <strong>TODOS os {items.length} documentos</strong>?</p>
-            <p className="text-xs text-red-500 mb-5">⚠️ Esta ação não pode ser revertida. Todos os PDFs, dados, checklists, cache e Excel serão apagados permanentemente.</p>
-            <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => setShowDeleteAll(false)}
-                className="h-11 rounded-xl bg-muted font-semibold text-sm transition hover:bg-muted/80">Cancelar</button>
-              <button onClick={handleDeleteAll} disabled={deleting}
-                className="h-11 rounded-xl bg-red-600 text-white font-semibold text-sm transition hover:bg-red-500 disabled:opacity-60 flex items-center justify-center gap-2">
-                {deleting ? <span className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Trash2 className="size-4" />}
-                Apagar Tudo
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
     </main>
   );
 }

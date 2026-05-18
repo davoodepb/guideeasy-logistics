@@ -3,6 +3,7 @@ export type Session = { name: string; phone: string; authenticated: boolean };
 
 const KEY = "prudencio_session";
 const APP_PASSWORD = "Rpavg5n";
+const CHEF_PASSWORD = "Renato2026"; // Password exclusiva do chef
 
 export function getSession(): Session | null {
   if (typeof window === "undefined") return null;
@@ -21,7 +22,13 @@ export function isAuthenticated(): boolean {
 }
 
 export function authenticate(password: string): boolean {
-  return password === APP_PASSWORD;
+  return password === APP_PASSWORD || password === CHEF_PASSWORD;
+}
+
+/** Retorna o nome/role com base na password usada */
+export function getNameForPassword(password: string): string {
+  if (password === CHEF_PASSWORD) return "Renato";
+  return "Operador";
 }
 
 export function setSession(s: Session) {

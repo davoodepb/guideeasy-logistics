@@ -10,6 +10,7 @@ import {
 import { useEffect } from "react";
 import { Toaster } from "sonner";
 import { initAnalytics } from "@/lib/firebase";
+import { initSupabaseWake } from "@/lib/supabase-wake-sync";
 import { InstallAppButton } from "@/components/InstallAppButton";
 
 import appCss from "../styles.css?url";
@@ -180,6 +181,7 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   useEffect(() => {
     initAnalytics();
+    initSupabaseWake(); // Auto-sync Firebase → Supabase quando Supabase volta
     // Force hide Lovable badge if it gets injected
     if (typeof window !== "undefined") {
       const hideBadge = () => {

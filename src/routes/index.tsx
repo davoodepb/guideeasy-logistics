@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { authenticate, setSession, getSession } from "@/lib/session";
+import { authenticate, setSession, getSession, getNameForPassword } from "@/lib/session";
 import { logUserStore as logUser } from "@/lib/store";
 import { toast } from "sonner";
 import { InstallAppButton } from "@/components/InstallAppButton";
@@ -38,8 +38,9 @@ function LoginPage() {
     await new Promise((r) => setTimeout(r, 600));
 
     if (authenticate(password.trim())) {
-      setSession({ name: "Operador", phone: "", authenticated: true });
-      logUser("Operador", "").catch(() => {});
+      const userName = getNameForPassword(password.trim());
+      setSession({ name: userName, phone: "", authenticated: true });
+      logUser(userName, "").catch(() => {});
       toast.success("Acesso autorizado ✓");
       navigate({ to: "/dashboard" });
     } else {
