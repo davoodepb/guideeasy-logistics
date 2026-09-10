@@ -1,13 +1,13 @@
 /**
  * ═══════════════════════════════════════════════════════════════
  * Firebase Client SDK — Configuração Central
- * Projeto: prudencio-main (ID: prudencio-main)
+ * Projeto: n8n-prudencio
  *
  * Este ficheiro:
  *  1. Inicializa o Firebase App (singleton, seguro para SSR)
  *  2. Exporta instâncias prontas de Auth, Firestore e Storage
- *  3. RTDB é lazy — só inicializa quando chamado (evita crash se databaseURL vazio)
- *  4. Mantém todo o CRUD de Checklists e Obras (migrado para Firestore)
+ *  3. RTDB disponível via databaseURL configurado
+ *  4. Todo o CRUD de Checklists, Obras e Users (Firestore)
  * ═══════════════════════════════════════════════════════════════
  */
 
@@ -39,27 +39,24 @@ import {
   deleteDoc,
   query,
   orderBy,
+  where,
+  limit,
   serverTimestamp,
 } from "firebase/firestore";
 import type { Firestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import type { FirebaseStorage } from "firebase/storage";
 
-// ─── Configuração Firebase ───────────────────────────────────────────
+// ─── Configuração Firebase (projeto n8n-prudencio) ──────────────────
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
-  authDomain:
-    import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ||
-    "prudencio-main.firebaseapp.com",
-  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL || undefined,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "prudencio-main",
-  storageBucket:
-    import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ||
-    "prudencio-main.firebasestorage.app",
-  messagingSenderId:
-    import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "37827545233",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "",
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "",
+  apiKey: "AIzaSyClBw569jLYXKWL6lr5hYl-3ppCT7_PzJg",
+  authDomain: "n8n-prudencio.firebaseapp.com",
+  databaseURL: "https://n8n-prudencio-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "n8n-prudencio",
+  storageBucket: "n8n-prudencio.firebasestorage.app",
+  messagingSenderId: "397008230620",
+  appId: "1:397008230620:web:a17568b43bca763719bc19",
+  measurementId: "G-EJEFSVQHLD",
 };
 
 // ─── Singleton App ───────────────────────────────────────────────────
@@ -86,27 +83,15 @@ export const firestore: Firestore = (() => {
   }
 })();
 
-/**
- * Realtime Database — inicialização LAZY.
- * Só inicializa quando chamado pela primeira vez.
- * Se databaseURL não estiver configurado, lança um erro claro.
- */
+/** Realtime Database */
 let _db: Database | null = null;
 export function getRtdb(): Database {
   if (_db) return _db;
-  if (!firebaseConfig.databaseURL) {
-    throw new Error(
-      "[Firebase] VITE_FIREBASE_DATABASE_URL não está configurado no .env. " +
-        "Se quiseres usar o Realtime Database, ativa-o na consola Firebase e " +
-        "adiciona a URL ao .env."
-    );
-  }
   _db = getDatabase(app);
   return _db;
 }
 
-// Exportar `db` como getter lazy para compatibilidade com código existente
-// Nota: o acesso a `db` vai lançar erro se RTDB não estiver configurado
+// Exportar `db` como getter lazy para compatibilidade
 export const db: Database = new Proxy({} as Database, {
   get(_target, prop, receiver) {
     const realDb = getRtdb();
@@ -195,7 +180,6 @@ export type Checklist = {
 };
 
 // ─── Firestore CRUD (Checklists) ─────────────────────────────────────
-// Migrado de Realtime Database para Firestore para funcionar sem RTDB.
 
 const checklistsCol = () => collection(firestore, "checklists");
 
@@ -203,7 +187,6 @@ export async function createChecklist(
   c: Omit<Checklist, "id">
 ): Promise<string> {
   const docRef = await addDoc(checklistsCol(), { ...c, created_at: c.created_at || Date.now() });
-  // Atualizar o doc com o seu próprio ID para manter compatibilidade
   await updateDoc(docRef, { id: docRef.id });
   return docRef.id;
 }
@@ -280,7 +263,7 @@ export async function deleteObra(id: string): Promise<void> {
 
 export async function logUser(name: string, phone: string) {
   try {
-    await addDoc(collection(firestore, "users"), {
+    await addDoc(collection(firestore, "app_users"), {
       name,
       phone,
       created_at: Date.now(),

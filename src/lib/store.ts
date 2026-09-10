@@ -1,178 +1,101 @@
 // ─── Camada de persistência ──────────────────────────────────────────
-// Suporta a base de dados SQL (via Server Functions do TanStack Start)
-// ou a base de dados Firebase Realtime Database cliente.
-// O comportamento é selecionado via VITE_USE_FIREBASE.
+// Todas as operações de dados passam exclusivamente pelo Firebase Firestore.
+// A autenticação (login/logout/session) continua em server-fns.ts.
 
 import {
-  createChecklistFn,
-  getChecklistFn,
-  listChecklistsFn,
-  listChecklistsWithItemsFn,
-  updateChecklistFn,
-  deleteChecklistFn,
-  deleteAllChecklistsFn,
-  createObraFn,
-  listObrasFn,
-  getObraFn,
-  updateObraFn,
-  deleteObraFn,
-  logUserFn,
-} from "./server-fns";
+  createChecklist,
+  getChecklist,
+  listChecklists,
+  updateChecklist,
+  deleteChecklist,
+  deleteAllChecklists,
+  createObra,
+  listObras,
+  getObra,
+  updateObra,
+  deleteObra,
+  logUser,
+} from "./firebase";
 import type { Checklist, ChecklistItem, PdfMetadata, Obra } from "./types";
 
 export type { Checklist, ChecklistItem, PdfMetadata, Obra };
 
-function useFirebase(): boolean {
-  return import.meta.env.VITE_USE_FIREBASE === "true";
-}
-
-// Lazy import do Firebase — só carrega quando VITE_USE_FIREBASE=true
-// Evita o crash "Firebase: Error (auth/invalid-api-key)" quando o Firebase não está configurado
-async function getFb() {
-  return import("./firebase");
-}
-
 // ─── OBRAS — CREATE ──────────────────────────────────────────────────
 
 export async function createObraStore(o: Omit<Obra, "id">): Promise<string> {
-  if (useFirebase()) {
-    const fb = await getFb();
-    return fb.createObra(o);
-  }
-  return createObraFn({
-    data: {
-      nome: o.nome,
-      descricao: o.descricao,
-      status: o.status,
-      created_by: o.created_by,
-    },
-  });
+  return createObra(o);
 }
 
 // ─── OBRAS — LIST ────────────────────────────────────────────────────
 
 export async function listObrasStore(): Promise<Obra[]> {
-  if (useFirebase()) {
-    const fb = await getFb();
-    return fb.listObras();
-  }
-  return listObrasFn();
+  return listObras();
 }
 
 // ─── OBRAS — GET (single) ────────────────────────────────────────────
 
 export async function getObraStore(id: string): Promise<Obra | null> {
-  if (useFirebase()) {
-    const fb = await getFb();
-    return fb.getObra(id);
-  }
-  return getObraFn({ data: { id } });
+  return getObra(id);
 }
 
 // ─── OBRAS — UPDATE (inclui Terminar Obra) ───────────────────────────
 
 export async function updateObraStore(id: string, patch: Partial<Obra>): Promise<void> {
-  if (useFirebase()) {
-    const fb = await getFb();
-    await fb.updateObra(id, patch);
-    return;
-  }
-  await updateObraFn({ data: { id, patch } });
+  await updateObra(id, patch);
 }
 
 // ─── OBRAS — DELETE ──────────────────────────────────────────────────
 
 export async function deleteObraStore(id: string): Promise<void> {
-  if (useFirebase()) {
-    const fb = await getFb();
-    await fb.deleteObra(id);
-    return;
-  }
-  await deleteObraFn({ data: { id } });
+  await deleteObra(id);
 }
 
 // ─── CREATE CHECKLIST ────────────────────────────────────────────────
 
 export async function createChecklistStore(c: Omit<Checklist, "id">): Promise<string> {
-  if (useFirebase()) {
-    const fb = await getFb();
-    return fb.createChecklist(c);
-  }
-  return createChecklistFn({ data: { checklist: c } });
+  return createChecklist(c);
 }
 
 // ─── READ (single) ───────────────────────────────────────────────────
 
 export async function getChecklistStore(id: string): Promise<Checklist | null> {
-  if (useFirebase()) {
-    const fb = await getFb();
-    return fb.getChecklist(id);
-  }
-  return getChecklistFn({ data: { id } });
+  return getChecklist(id);
 }
 
 // ─── LIST ────────────────────────────────────────────────────────────
 
 export async function listChecklistsStore(obraId?: string): Promise<Checklist[]> {
-  if (useFirebase()) {
-    const fb = await getFb();
-    const all = await fb.listChecklists();
-    return obraId ? all.filter((c) => c.obra_id === obraId) : all;
-  }
-  return listChecklistsFn({ data: { obraId } });
+  const all = await listChecklists();
+  return obraId ? all.filter((c) => c.obra_id === obraId) : all;
 }
 
 // ─── LIST WITH ITEMS (para cálculo de stock) ─────────────────────────
 
 export async function listChecklistsWithItemsStore(obraId: string): Promise<Checklist[]> {
-  if (useFirebase()) {
-    const fb = await getFb();
-    const all = await fb.listChecklists();
-    return all.filter((c) => c.obra_id === obraId);
-  }
-  return listChecklistsWithItemsFn({ data: { obraId } });
+  const all = await listChecklists();
+  return all.filter((c) => c.obra_id === obraId);
 }
 
 // ─── UPDATE ──────────────────────────────────────────────────────────
 
 export async function updateChecklistStore(id: string, patch: Partial<Checklist>) {
-  if (useFirebase()) {
-    const fb = await getFb();
-    await fb.updateChecklist(id, patch);
-    return;
-  }
-  await updateChecklistFn({ data: { id, patch } });
+  await updateChecklist(id, patch);
 }
 
 // ─── DELETE (single) ─────────────────────────────────────────────────
 
 export async function deleteChecklistStore(id: string): Promise<void> {
-  if (useFirebase()) {
-    const fb = await getFb();
-    await fb.deleteChecklist(id);
-    return;
-  }
-  await deleteChecklistFn({ data: { id } });
+  await deleteChecklist(id);
 }
 
 // ─── DELETE ALL ──────────────────────────────────────────────────────
 
 export async function deleteAllChecklistsStore(): Promise<void> {
-  if (useFirebase()) {
-    const fb = await getFb();
-    await fb.deleteAllChecklists();
-    return;
-  }
-  await deleteAllChecklistsFn();
+  await deleteAllChecklists();
 }
 
 // ─── LOG USER ────────────────────────────────────────────────────────
 
 export async function logUserStore(name: string, phone: string): Promise<void> {
-  if (useFirebase()) {
-    const fb = await getFb();
-    await fb.logUser(name, phone);
-    return;
-  }
-  await logUserFn({ data: { name, phone } });
+  await logUser(name, phone);
 }

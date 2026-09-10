@@ -32,7 +32,6 @@ self.addEventListener("fetch", (event) => {
     url.origin !== self.location.origin ||
     url.pathname.startsWith("/api") ||
     url.pathname.startsWith("/_server") ||
-    url.hostname.includes("supabase") ||
     url.hostname.includes("firebase") ||
     url.hostname.includes("googleapis")
   ) {

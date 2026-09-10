@@ -5,26 +5,22 @@ service cloud.firestore {
     // ─── Users (admin gerido pelo servidor) ─────────────────────
     match /users/{userId} {
       // Apenas o servidor (Admin SDK) pode ler/escrever users
-      // O Admin SDK bypassa todas as regras
       allow read, write: if false;
     }
 
     // ─── App Users (colaboradores) ──────────────────────────────
     match /app_users/{userId} {
-      allow read: if true;
-      allow write: if false; // Apenas via Admin SDK
+      allow read, write: if true;
     }
 
     // ─── Obras ──────────────────────────────────────────────────
     match /obras/{obraId} {
-      allow read: if true;
-      allow write: if false; // Apenas via Admin SDK
+      allow read, write: if true;
     }
 
     // ─── Checklists ─────────────────────────────────────────────
     match /checklists/{checklistId} {
-      allow read: if true;
-      allow write: if false; // Apenas via Admin SDK
+      allow read, write: if true;
     }
 
     // ─── Teste de conexão (temporário) ──────────────────────────

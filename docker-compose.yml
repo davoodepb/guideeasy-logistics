@@ -1,71 +1,17 @@
 # ═══════════════════════════════════════════════════════════════
-# GuidEasy Logistics — Docker Compose (On-Premises)
-# Inicia PostgreSQL + Aplicação com um único comando:
+# GuidEasy Logistics — Docker Compose (Firebase Edition)
+# Apenas a aplicação — dados armazenados no Firebase Firestore.
 #   docker compose up -d
 # ═══════════════════════════════════════════════════════════════
 
 services:
-  db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
-    environment:
-      POSTGRES_DB: ${DB_NAME:-guideeasy}
-      POSTGRES_USER: ${DB_USER:-guideeasy}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
-    ports:
-      - "${DB_PORT:-5432}:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-guideeasy} -d ${DB_NAME:-guideeasy}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   app:
     build: .
     restart: unless-stopped
     ports:
       - "${PORT:-3000}:3000"
     environment:
-      DB_CLIENT: pg
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-guideeasy}
-      DB_USER: ${DB_USER:-guideeasy}
-      DB_PASSWORD: ${DB_PASSWORD:-changeme}
+      FIREBASE_SERVICE_ACCOUNT: ${FIREBASE_SERVICE_ACCOUNT}
       JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET no ficheiro .env}
       NODE_ENV: production
       PORT: 3000
-    depends_on:
-      db:
-        condition: service_healthy
-
-  # ─── Backup automático (opcional) ───────────────────────
-  # Descomente para ativar backups diários às 02:00
-  #
-  # backup:
-  #   image: postgres:16-alpine
-  #   restart: unless-stopped
-  #   volumes:
-  #     - ./backups:/backups
-  #   environment:
-  #     PGHOST: db
-  #     PGUSER: ${DB_USER:-guideeasy}
-  #     PGPASSWORD: ${DB_PASSWORD:-changeme}
-  #     PGDATABASE: ${DB_NAME:-guideeasy}
-  #   entrypoint: /bin/sh
-  #   command: >
-  #     -c 'while true; do
-  #       sleep 86400;
-  #       pg_dump -Fc > /backups/guideeasy_$(date +%Y%m%d_%H%M%S).dump;
-  #       find /backups -name "*.dump" -mtime +30 -delete;
-  #       echo "[backup] Concluído: $(date)";
-  #     done'
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
-
-volumes:
-  pgdata:
