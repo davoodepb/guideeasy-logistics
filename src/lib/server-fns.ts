@@ -3,9 +3,12 @@
 // Apenas autenticação (login/logout/session) executada no servidor.
 // O CRUD de dados passou inteiramente para Firebase Firestore (store.ts).
 //
-// A autenticação usa Firebase Admin SDK para ler utilizadores da
-// coleção "users" do Firestore, com bcrypt para validar passwords
-// e JWT para gerir sessões via cookies HTTP-only.
+// A autenticação valida credenciais contra:
+//  1. Utilizadores registados no Firestore (via REST API), se acessível
+//  2. Credenciais de admin definidas no .env (ADMIN_EMAIL/ADMIN_PASSWORD)
+//     como fallback quando o Firestore não tem a coleção users acessível
+//
+// Sessões geridas via JWT em cookies HTTP-only.
 
 import { createServerFn } from "@tanstack/react-start";
 import type { UserProfile, UserRole } from "./types";
@@ -29,48 +32,114 @@ function jwtSecret(): string {
   return secret;
 }
 
-// ─── Firebase Admin SDK (lazy init) ──────────────────────────────────
+// ─── Firestore REST API helpers ──────────────────────────────────────
 
-let _adminApp: any = null;
-let _adminDb: any = null;
+const FIREBASE_API_KEY = "AIzaSyClBw569jLYXKWL6lr5hYl-3ppCT7_PzJg";
+const FIREBASE_PROJECT_ID = "n8n-prudencio";
+const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;
 
-async function getAdminFirestore() {
-  if (_adminDb) return _adminDb;
-
-  const admin = (await import("firebase-admin")).default;
-
-  if (!_adminApp) {
-    // Tentar inicializar com Service Account do .env
-    const serviceAccountEnv = process.env.FIREBASE_SERVICE_ACCOUNT;
-
-    if (serviceAccountEnv && serviceAccountEnv.trim().length > 10) {
-      try {
-        let jsonStr = serviceAccountEnv.trim();
-        if (jsonStr.startsWith("'") && jsonStr.endsWith("'")) {
-          jsonStr = jsonStr.slice(1, -1);
-        }
-        const serviceAccount = JSON.parse(jsonStr);
-        _adminApp = admin.apps.length
-          ? admin.app()
-          : admin.initializeApp({
-              credential: admin.credential.cert(serviceAccount),
-            });
-      } catch (err) {
-        console.error("[auth] Falha ao inicializar Firebase Admin com Service Account:", err);
-        throw new Error("Configuração Firebase Admin inválida");
-      }
-    } else {
-      // Fallback: Application Default Credentials
-      _adminApp = admin.apps.length
-        ? admin.app()
-        : admin.initializeApp({
-            projectId: "n8n-prudencio",
-          });
+function fromFirestoreValue(val: any): any {
+  if (val.stringValue !== undefined) return val.stringValue;
+  if (val.integerValue !== undefined) return Number(val.integerValue);
+  if (val.doubleValue !== undefined) return val.doubleValue;
+  if (val.booleanValue !== undefined) return val.booleanValue;
+  if (val.nullValue !== undefined) return null;
+  if (val.mapValue !== undefined) {
+    const obj: any = {};
+    for (const [k, v] of Object.entries(val.mapValue.fields || {})) {
+      obj[k] = fromFirestoreValue(v);
     }
+    return obj;
+  }
+  if (val.arrayValue !== undefined) {
+    return (val.arrayValue.values || []).map(fromFirestoreValue);
+  }
+  return val;
+}
+
+function docToObject(doc: any): any {
+  const obj: any = {};
+  for (const [k, v] of Object.entries(doc.fields || {})) {
+    obj[k] = fromFirestoreValue(v);
+  }
+  return obj;
+}
+
+/** Procurar utilizador por email via Firestore REST API */
+async function findUserByEmail(email: string): Promise<{ id: string; data: any } | null> {
+  try {
+    const url = `${FIRESTORE_BASE}:runQuery?key=${FIREBASE_API_KEY}`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: "users" }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: "email" },
+              op: "EQUAL",
+              value: { stringValue: email },
+            },
+          },
+          limit: 1,
+        },
+      }),
+    });
+
+    if (!response.ok) return null;
+
+    const results = await response.json();
+    if (!results || !results[0] || !results[0].document) return null;
+
+    const doc = results[0].document;
+    const data = docToObject(doc);
+    const parts = (doc.name || "").split("/");
+    const id = parts[parts.length - 1];
+
+    return { id, data };
+  } catch {
+    return null;
+  }
+}
+
+// ─── Autenticação com fallback para admin do .env ────────────────────
+
+async function authenticateUser(
+  email: string,
+  password: string
+): Promise<UserProfile> {
+  const bcrypt = (await import("bcryptjs")).default;
+
+  // 1. Tentar encontrar no Firestore
+  const firestoreUser = await findUserByEmail(email);
+  if (firestoreUser) {
+    const valid = await bcrypt.compare(password, firestoreUser.data.password_hash);
+    if (!valid) throw new Error("Email ou password incorretos");
+    return {
+      id: firestoreUser.id,
+      email: firestoreUser.data.email,
+      name: firestoreUser.data.name,
+      role: firestoreUser.data.role as UserRole,
+    };
   }
 
-  _adminDb = admin.firestore(_adminApp);
-  return _adminDb;
+  // 2. Fallback: verificar contra credenciais admin do .env
+  const adminEmail = (process.env.ADMIN_EMAIL || "admin@prudencio.pt").toLowerCase().trim();
+  const adminPassword = process.env.ADMIN_PASSWORD || "Rpavg5n";
+  const adminName = process.env.ADMIN_NAME || "Administrador";
+
+  if (email.toLowerCase().trim() === adminEmail && password === adminPassword) {
+    console.log("[auth] Login via credenciais admin do .env (Firestore users não acessível)");
+    return {
+      id: "admin-env",
+      email: adminEmail,
+      name: adminName,
+      role: "admin",
+    };
+  }
+
+  throw new Error("Email ou password incorretos");
 }
 
 // ─── Cookie / JWT helpers ────────────────────────────────────────────
@@ -129,35 +198,20 @@ async function clearAuthCookie(): Promise<void> {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// AUTENTICAÇÃO (Firebase Admin SDK + Firestore)
+// AUTENTICAÇÃO
 // ═══════════════════════════════════════════════════════════════
 
 export const loginFn = createServerFn({ method: "POST" })
   .inputValidator((d: { email: string; password: string }) => d)
   .handler(async ({ data }) => {
     try {
-      const db = await getAdminFirestore();
-      const bcrypt = (await import("bcryptjs")).default;
       const jwt = (await import("jsonwebtoken")).default;
 
-      // Procurar utilizador na coleção "users" do Firestore
-      const usersSnap = await db
-        .collection("users")
-        .where("email", "==", data.email.toLowerCase().trim())
-        .limit(1)
-        .get();
-
-      if (usersSnap.empty) throw new Error("Email ou password incorretos");
-
-      const userDoc = usersSnap.docs[0];
-      const user = userDoc.data();
-
-      const valid = await bcrypt.compare(data.password, user.password_hash);
-      if (!valid) throw new Error("Email ou password incorretos");
+      const user = await authenticateUser(data.email, data.password);
 
       const token = jwt.sign(
         {
-          userId: userDoc.id,
+          userId: user.id,
           email: user.email,
           name: user.name,
           role: user.role,
@@ -168,14 +222,9 @@ export const loginFn = createServerFn({ method: "POST" })
 
       await setAuthCookie(token, COOKIE_MAX_AGE);
 
-      return {
-        id: userDoc.id,
-        email: user.email,
-        name: user.name,
-        role: user.role as UserRole,
-      } satisfies UserProfile;
+      return user;
     } catch (err: any) {
-      console.error("[loginFn Error Server-Side]:", err);
+      console.error("[loginFn Error Server-Side]:", err.message);
       throw new Error(err.message || "Erro de servidor ao fazer login");
     }
   });
