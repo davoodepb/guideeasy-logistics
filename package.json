@@ -9,8 +9,7 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
-    "format": "prettier --write .",
-    "migrate:firestore": "node scripts/migrate-to-firestore.mjs"
+    "format": "prettier --write ."
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -52,7 +51,6 @@
     "date-fns": "^4.1.0",
     "embla-carousel-react": "^8.6.0",
     "firebase": "^12.15.0",
-    "firebase-admin": "^13.0.2",
     "input-otp": "^1.4.2",
     "jsonwebtoken": "^9.0.2",
     "jsqr": "^1.4.0",

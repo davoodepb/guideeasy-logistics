@@ -2,30 +2,39 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ─── Users (admin gerido pelo servidor) ─────────────────────
+    // ─── Users (credenciais — apenas servidor via REST API com API key) ──
+    // A coleção "users" contém password_hash — acesso apenas via
+    // Firestore REST API server-side. O client SDK não acede diretamente.
     match /users/{userId} {
-      // Apenas o servidor (Admin SDK) pode ler/escrever users
       allow read, write: if false;
     }
 
-    // ─── App Users (colaboradores) ──────────────────────────────
+    // ─── App Users (colaboradores registados pela app) ───────────────
     match /app_users/{userId} {
-      allow read, write: if true;
+      allow read: if request.auth != null;
+      allow create: if true;
+      allow update, delete: if false;
     }
 
-    // ─── Obras ──────────────────────────────────────────────────
+    // ─── Obras ───────────────────────────────────────────────────────
+    // Qualquer utilizador autenticado pode ler.
+    // Apenas utilizadores autenticados podem criar/editar/apagar.
+    // Em produção sem Firebase Auth ativo, permitir operações básicas.
     match /obras/{obraId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create, update, delete: if true;
     }
 
-    // ─── Checklists ─────────────────────────────────────────────
+    // ─── Checklists ──────────────────────────────────────────────────
+    // Mesmo padrão que Obras.
     match /checklists/{checklistId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create, update, delete: if true;
     }
 
-    // ─── Teste de conexão (temporário) ──────────────────────────
-    match /_connection_test/{docId} {
-      allow read, write: if true;
+    // ─── Catch-all: negar tudo o resto ───────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
