@@ -272,3 +272,51 @@ export async function logUser(name: string, phone: string) {
     console.warn("logUser falhou (regras Firebase):", e);
   }
 }
+
+// ─── Firestore CRUD (Histórico / Activity Log) ──────────────────────
+
+export type ActivityLog = {
+  id: string;
+  action: string;
+  entity_type: string;
+  entity_id?: string;
+  entity_name?: string;
+  user_email?: string;
+  user_name?: string;
+  details?: string;
+  created_at: number;
+};
+
+const activityCol = () => collection(firestore, "activity_log");
+
+export async function createActivityLog(
+  log: Omit<ActivityLog, "id">
+): Promise<string> {
+  const docRef = await addDoc(activityCol(), {
+    ...log,
+    created_at: log.created_at || Date.now(),
+  });
+  await updateDoc(docRef, { id: docRef.id });
+  return docRef.id;
+}
+
+export async function listActivityLogs(): Promise<ActivityLog[]> {
+  try {
+    const q = query(activityCol(), orderBy("created_at", "desc"));
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() } as ActivityLog));
+  } catch (e) {
+    console.warn("listActivityLogs falhou:", e);
+    return [];
+  }
+}
+
+export async function deleteActivityLog(id: string): Promise<void> {
+  await deleteDoc(doc(firestore, "activity_log", id));
+}
+
+export async function deleteAllActivityLogs(): Promise<void> {
+  const snap = await getDocs(activityCol());
+  const deletePromises = snap.docs.map((d) => deleteDoc(d.ref));
+  await Promise.all(deletePromises);
+}

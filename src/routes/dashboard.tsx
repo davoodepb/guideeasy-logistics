@@ -195,6 +195,24 @@ function Dashboard() {
           </div>
           <ChevronRight className="size-4 text-muted-foreground" />
         </Link>
+
+        {profile?.role === "admin" && (
+          <Link
+            to="/historico"
+            className="flex items-center gap-3 bg-card border rounded-2xl p-4 shadow-sm hover:shadow-md active:scale-[0.99] transition"
+          >
+            <div className="size-11 rounded-xl bg-amber-500/10 flex items-center justify-center">
+              <Clock className="size-5 text-amber-600" />
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-sm">Histórico de Atividades</p>
+              <p className="text-xs text-muted-foreground">
+                Auditoria, exportação e gestão de registos
+              </p>
+            </div>
+            <ChevronRight className="size-4 text-muted-foreground" />
+          </Link>
+        )}
       </section>
 
       {/* Instalar App */}

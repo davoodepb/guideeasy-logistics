@@ -15,10 +15,15 @@ import {
   updateObra,
   deleteObra,
   logUser,
+  createActivityLog,
+  listActivityLogs,
+  deleteActivityLog,
+  deleteAllActivityLogs,
 } from "./firebase";
 import type { Checklist, ChecklistItem, PdfMetadata, Obra } from "./types";
+import type { ActivityLog } from "./firebase";
 
-export type { Checklist, ChecklistItem, PdfMetadata, Obra };
+export type { Checklist, ChecklistItem, PdfMetadata, Obra, ActivityLog };
 
 // ─── OBRAS — CREATE ──────────────────────────────────────────────────
 
@@ -98,4 +103,43 @@ export async function deleteAllChecklistsStore(): Promise<void> {
 
 export async function logUserStore(name: string, phone: string): Promise<void> {
   await logUser(name, phone);
+}
+
+// ─── ACTIVITY LOG (Histórico) ────────────────────────────────────────
+
+export async function logActivity(
+  action: string,
+  entityType: string,
+  entityId?: string,
+  entityName?: string,
+  userEmail?: string,
+  userName?: string,
+  details?: string
+): Promise<void> {
+  try {
+    await createActivityLog({
+      action,
+      entity_type: entityType,
+      entity_id: entityId,
+      entity_name: entityName,
+      user_email: userEmail,
+      user_name: userName,
+      details,
+      created_at: Date.now(),
+    });
+  } catch (e) {
+    console.warn("logActivity falhou:", e);
+  }
+}
+
+export async function listActivityLogsStore(): Promise<ActivityLog[]> {
+  return listActivityLogs();
+}
+
+export async function deleteActivityLogStore(id: string): Promise<void> {
+  await deleteActivityLog(id);
+}
+
+export async function deleteAllActivityLogsStore(): Promise<void> {
+  await deleteAllActivityLogs();
 }
