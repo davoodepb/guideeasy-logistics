@@ -196,7 +196,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "preconnect",
         href: "https://fonts.gstatic.com",
         crossOrigin: "anonymous",
-      } as any,
+      },
       {
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap",
@@ -287,13 +287,14 @@ function RootComponent() {
     // Force hide Lovable badge if it gets injected
     if (typeof window !== "undefined") {
       const hideBadge = () => {
-        document.querySelectorAll("div, iframe, a").forEach((el: any) => {
+        document.querySelectorAll<HTMLElement>("div, iframe, a").forEach((el) => {
+          const id = el.id.toLowerCase();
+          const className = typeof el.className === "string" ? el.className.toLowerCase() : "";
+          const src = "src" in el && typeof el.src === "string" ? el.src : "";
           if (
-            (el.id && el.id.toLowerCase().includes("lovable")) ||
-            (el.className &&
-              typeof el.className === "string" &&
-              el.className.toLowerCase().includes("lovable")) ||
-            (el.src && el.src.includes("lovable")) ||
+            id.includes("lovable") ||
+            className.includes("lovable") ||
+            src.includes("lovable") ||
             (el.textContent &&
               el.textContent.includes("Edit with") &&
               el.textContent.includes("Lovable"))

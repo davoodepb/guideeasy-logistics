@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   listChecklistsWithItemsStore,
   updateObraStore,
@@ -65,17 +65,7 @@ function ObraDetailPage() {
   const [confirmApagar, setConfirmApagar] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    if (!user) {
-      navigate({ to: "/" });
-      return;
-    }
-    load();
-  }, [id, user]);
-
-  if (!user) return null;
-
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const [o, g] = await Promise.all([fetchObra(id), listChecklistsWithItemsStore(id)]);
@@ -86,10 +76,23 @@ function ObraDetailPage() {
       }
       setObra(o);
       setGuias(g);
+    } catch (error) {
+      console.warn("Erro ao carregar a obra:", error);
+      toast.error("Não foi possível carregar os dados da obra.");
     } finally {
       setLoading(false);
     }
-  }
+  }, [id, navigate]);
+
+  useEffect(() => {
+    if (!user) {
+      navigate({ to: "/" });
+      return;
+    }
+    void load();
+  }, [load, navigate, user]);
+
+  if (!user) return null;
 
   async function handleTerminarObra() {
     if (!obra) return;
@@ -98,7 +101,7 @@ function ObraDetailPage() {
       await updateObraStore(id, { status: "terminada", terminated_at: Date.now() });
       toast.success("Obra terminada");
       setConfirmTerminar(false);
-      load();
+      void load();
     } catch (e: unknown) {
       toast.error("Erro: " + (e instanceof Error ? e.message : String(e)));
     } finally {

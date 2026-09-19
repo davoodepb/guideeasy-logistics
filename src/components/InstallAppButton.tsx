@@ -12,8 +12,20 @@ import {
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void> | void;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+};
+
+declare global {
+  interface Window {
+    deferredPrompt: BeforeInstallPromptEvent | null;
+    MSStream?: unknown;
+  }
+}
+
 export function InstallAppButton({ variant = "icon" }: { variant?: "icon" | "full" }) {
-  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isStandalone, setIsStandalone] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [isAndroid, setIsAndroid] = useState(false);
@@ -25,43 +37,48 @@ export function InstallAppButton({ variant = "icon" }: { variant?: "icon" | "ful
     // Mark as mounted to avoid hydration mismatch
     setIsMounted(true);
 
+    const navigatorWithStandalone = window.navigator as Navigator & { standalone?: boolean };
     const standalone =
       window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as any).standalone === true;
+      navigatorWithStandalone.standalone === true;
     setIsStandalone(standalone);
 
     const ua = navigator.userAgent;
-    setIsIOS(/iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream);
+    setIsIOS(/iPad|iPhone|iPod/.test(ua) && !window.MSStream);
     setIsAndroid(/android/i.test(ua));
 
     // Use already-captured prompt from RootShell script
-    const prompt = (window as any).deferredPrompt;
+    const prompt = window.deferredPrompt;
     if (prompt) {
       setInstallPrompt(prompt);
     }
 
-    const capturePrompt = (e: Event) => {
-      e.preventDefault();
-      setInstallPrompt(e);
-      (window as any).deferredPrompt = e;
+    const capturePrompt = (event: Event) => {
+      if (!("prompt" in event) || !("userChoice" in event)) return;
+      event.preventDefault();
+      const promptEvent = event as BeforeInstallPromptEvent;
+      setInstallPrompt(promptEvent);
+      window.deferredPrompt = promptEvent;
+    };
+
+    const handleInstalled = () => {
+      setInstallPrompt(null);
+      window.deferredPrompt = null;
+      setIsStandalone(true);
+      toast.success("Aplicação instalada. Pode fechar o browser.");
     };
 
     window.addEventListener("beforeinstallprompt", capturePrompt);
-
-    window.addEventListener("appinstalled", () => {
-      setInstallPrompt(null);
-      (window as any).deferredPrompt = null;
-      setIsStandalone(true);
-      toast.success("Aplicação instalada. Pode fechar o browser.");
-    });
+    window.addEventListener("appinstalled", handleInstalled);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", capturePrompt);
+      window.removeEventListener("appinstalled", handleInstalled);
     };
   }, []);
 
   const handleInstall = useCallback(async () => {
-    const prompt = installPrompt || (window as any).deferredPrompt;
+    const prompt = installPrompt || window.deferredPrompt;
 
     if (prompt) {
       setInstalling(true);
@@ -71,14 +88,14 @@ export function InstallAppButton({ variant = "icon" }: { variant?: "icon" | "ful
         if (outcome === "accepted") {
           toast.success("Aplicação instalada com sucesso.");
           setInstallPrompt(null);
-          (window as any).deferredPrompt = null;
+          window.deferredPrompt = null;
         } else {
           toast("Instalação cancelada. Pode instalar mais tarde.");
         }
       } catch (err) {
         console.error("[PWA] Install error:", err);
         setInstallPrompt(null);
-        (window as any).deferredPrompt = null;
+        window.deferredPrompt = null;
         showFallbackInstructions();
       } finally {
         setInstalling(false);
@@ -139,7 +156,7 @@ export function InstallAppButton({ variant = "icon" }: { variant?: "icon" | "ful
   }
 
   const isBrowser = typeof window !== "undefined";
-  const hasPrompt = !!(installPrompt || (isBrowser && (window as any).deferredPrompt));
+  const hasPrompt = !!(installPrompt || (isBrowser && window.deferredPrompt));
 
   // Avoid hydration mismatch: render placeholder until mounted
   if (!isMounted) {

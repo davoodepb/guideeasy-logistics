@@ -8,10 +8,10 @@ const normalizarDataPT = (raw: string) => {
   if (!raw) return "";
 
   // Limpar espaços nas pontas e reduzir espaços internos
-  let limpo = raw.trim().replace(/\s+/g, "");
+  const limpo = raw.trim().replace(/\s+/g, "");
 
   // 1. Procura padrão de data americana/ISO AAAA-MM-DD em qualquer lugar do texto
-  let isoMatch = limpo.match(/(\d{4})[-\/.](\d{2})[-\/.](\d{2})/);
+  const isoMatch = limpo.match(/(\d{4})[-/.](\d{2})[-/.](\d{2})/);
   if (isoMatch) {
     const year = isoMatch[1];
     const month = isoMatch[2];
@@ -20,7 +20,7 @@ const normalizarDataPT = (raw: string) => {
   }
 
   // 2. Procura padrão europeu/PT DD-MM-AAAA ou DD/MM/AAAA em qualquer lugar do texto
-  let ptMatch = limpo.match(/(\d{2})[-\/.](\d{2})[-\/.](\d{4})/);
+  const ptMatch = limpo.match(/(\d{2})[-/.](\d{2})[-/.](\d{4})/);
   if (ptMatch) {
     const day = ptMatch[1];
     const month = ptMatch[2];
@@ -163,9 +163,11 @@ export async function extractFromPdf(file: File): Promise<ExtractedData> {
   for (let p = 1; p <= pdf.numPages; p++) {
     const page = await pdf.getPage(p);
     const content = await page.getTextContent();
-    for (const it of content.items as any[]) {
-      const t = it.transform;
-      tokens.push({ str: it.str, x: t[4], y: t[5], w: it.width, page: p });
+    for (const item of content.items) {
+      if (!("str" in item) || !("transform" in item)) continue;
+      const textItem = item as { str: string; transform: number[]; width?: number };
+      const t = textItem.transform;
+      tokens.push({ str: textItem.str, x: t[4], y: t[5], w: textItem.width ?? 0, page: p });
     }
   }
 
@@ -228,7 +230,7 @@ export async function extractFromPdf(file: File): Promise<ExtractedData> {
   }
 
   // ──── ATCUD ────
-  const atcudMatch = fullText.match(/ATCUD[:\s]*([A-Z0-9][A-Z0-9\-]+)/i);
+  const atcudMatch = fullText.match(/ATCUD[:\s]*([A-Z0-9][A-Z0-9-]+)/i);
   const atcud = atcudMatch ? atcudMatch[1] : "";
 
   // ──── Número da Guia ────
@@ -256,7 +258,7 @@ export async function extractFromPdf(file: File): Promise<ExtractedData> {
   }
 
   // Regex que apanha qualquer data (YYYY-MM-DD ou DD/MM/YYYY, com traços ou barras)
-  const padraoData = /(\d{4}[-\/]\d{2}[-\/]\d{2}|\d{2}[-\/]\d{2}[-\/]\d{4})/;
+  const padraoData = /(\d{4}[-/]\d{2}[-/]\d{2}|\d{2}[-/]\d{2}[-/]\d{4})/;
 
   // ──── DATA DO DOCUMENTO ────
   let data_documento = "";
@@ -270,7 +272,7 @@ export async function extractFromPdf(file: File): Promise<ExtractedData> {
   const vn_contrib = vnContribMatch ? vnContribMatch[1] : "";
 
   // ──── Requisição ────
-  const reqMatch = fullText.match(/Requisi[çc][ãa]o[:\s]*([A-Za-z0-9\-\/]+)/i);
+  const reqMatch = fullText.match(/Requisi[çc][ãa]o[:\s]*([-A-Za-z0-9/]+)/i);
   const requisicao = reqMatch ? reqMatch[1].trim() : "";
 
   // ──── EMISSOR ────
@@ -288,7 +290,7 @@ export async function extractFromPdf(file: File): Promise<ExtractedData> {
   let contactos = "";
   const telMatch = fullText.match(/Telef\.?\s*([\d\s]+)/i);
   if (telMatch) contactos = `Telef. ${telMatch[1].trim()}`;
-  const emailMatch = fullText.match(/([a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,})/i);
+  const emailMatch = fullText.match(/([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})/i);
   if (emailMatch) contactos += (contactos ? " / " : "") + emailMatch[1];
 
   let capital_social = "";
@@ -561,7 +563,7 @@ export async function extractFromPdf(file: File): Promise<ExtractedData> {
 
   try {
     const { extractQRFromPdf } = await import("./qr-extract");
-    const qrResults = await extractQRFromPdf(pdf, pdfjs);
+    const qrResults = await extractQRFromPdf(pdf);
     if (qrResults.length > 0) {
       const best = qrResults.reduce((a, b) => (b.confidence > a.confidence ? b : a));
       qr_at_code = best.atCode;

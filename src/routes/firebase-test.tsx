@@ -11,22 +11,9 @@
 
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useCallback } from "react";
-import { app, auth, firestore, getRtdb, storage } from "@/lib/firebase";
-import {
-  doc,
-  setDoc,
-  getDoc,
-  deleteDoc,
-  collection,
-  getDocs,
-} from "firebase/firestore";
-import { ref as storageRef } from "firebase/storage";
-import {
-  ref as dbRef,
-  set as dbSet,
-  get as dbGet,
-  remove as dbRemove,
-} from "firebase/database";
+import { app, auth, firebaseConfigStatus, firestore, storage } from "@/lib/firebase";
+import { doc, setDoc, getDoc, deleteDoc } from "firebase/firestore";
+import { deleteObject, getDownloadURL, ref as storageRef, uploadBytes } from "firebase/storage";
 
 export const Route = createFileRoute("/firebase-test")({
   component: FirebaseTestPage,
@@ -45,20 +32,27 @@ interface TestResult {
   durationMs?: number;
 }
 
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function getErrorCode(error: unknown): string {
+  if (typeof error === "object" && error !== null && "code" in error) {
+    const code = (error as { code?: unknown }).code;
+    if (typeof code === "string") return code;
+  }
+  return "UNKNOWN";
+}
+
 // ─── Componente Principal ────────────────────────────────────────────
 
 function FirebaseTestPage() {
   const [results, setResults] = useState<TestResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
 
-  const updateResult = useCallback(
-    (index: number, update: Partial<TestResult>) => {
-      setResults((prev) =>
-        prev.map((r, i) => (i === index ? { ...r, ...update } : r))
-      );
-    },
-    []
-  );
+  const updateResult = useCallback((index: number, update: Partial<TestResult>) => {
+    setResults((prev) => prev.map((r, i) => (i === index ? { ...r, ...update } : r)));
+  }, []);
 
   const runTests = useCallback(async () => {
     setIsRunning(true);
@@ -83,8 +77,8 @@ function FirebaseTestPage() {
         message: "A verificar...",
       },
       {
-        name: "Realtime Database (Read/Write)",
-        icon: "🗄️",
+        name: "Histórico de Atividades (activity_log)",
+        icon: "🧾",
         status: "running",
         message: "A verificar...",
       },
@@ -102,26 +96,25 @@ function FirebaseTestPage() {
     try {
       const name = app.name;
       const projectId = app.options.projectId;
-      const hasApiKey = !!app.options.apiKey;
-      const hasAppId = !!app.options.appId;
 
-      if (!hasApiKey || !hasAppId) {
+      if (!firebaseConfigStatus.configured) {
         updateResult(0, {
           status: "fail",
-          message: `App "${name}" inicializada mas faltam chaves! apiKey: ${hasApiKey ? "✓" : "✗ VAZIO"} | appId: ${hasAppId ? "✓" : "✗ VAZIO"}. Cola as chaves no .env`,
+          message:
+            "Configuração incompleta. Faltam: " + firebaseConfigStatus.missing.join(", ") + ".",
           durationMs: Math.round(performance.now() - t0),
         });
       } else {
         updateResult(0, {
           status: "pass",
-          message: `App "${name}" → projeto "${projectId}" | apiKey ✓ | appId ✓`,
+          message: `App "${name}" → projeto "${projectId}" | configuração ✓`,
           durationMs: Math.round(performance.now() - t0),
         });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       updateResult(0, {
         status: "fail",
-        message: err.message,
+        message: getErrorMessage(err),
         durationMs: Math.round(performance.now() - t0),
       });
     }
@@ -129,16 +122,17 @@ function FirebaseTestPage() {
     // ── Teste 2: Auth ─────────────────────────────────────────
     const t1 = performance.now();
     try {
+      if (!auth) throw new Error("Firebase Authentication não está configurado.");
       const authDomain = auth.config.authDomain || "não configurado";
       updateResult(1, {
         status: "pass",
         message: `Auth pronto — authDomain: ${authDomain}`,
         durationMs: Math.round(performance.now() - t1),
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       updateResult(1, {
         status: "fail",
-        message: err.message,
+        message: getErrorMessage(err),
         durationMs: Math.round(performance.now() - t1),
       });
     }
@@ -146,7 +140,10 @@ function FirebaseTestPage() {
     // ── Teste 3: Firestore ────────────────────────────────────
     const t2 = performance.now();
     try {
-      const testDocRef = doc(firestore, "_connection_test", "ping");
+      if (!auth?.currentUser) {
+        throw new Error("Inicie sessão para testar as regras protegidas do Firestore.");
+      }
+      const testDocRef = doc(firestore, "_connection_test", "firestore-" + crypto.randomUUID());
       const testData = {
         ok: true,
         timestamp: Date.now(),
@@ -169,55 +166,61 @@ function FirebaseTestPage() {
           durationMs: Math.round(performance.now() - t2),
         });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const code = getErrorCode(err);
       const hint =
-        err.code === "permission-denied"
-          ? " → Ative o Firestore na consola e configure regras de teste."
-          : err.code === "unavailable"
+        code === "permission-denied"
+          ? " → Publique as regras seguras do Firestore e confirme que a conta tem acesso."
+          : code === "unavailable"
             ? " → Verifique se o Firestore está ativado na consola Firebase."
             : "";
       updateResult(2, {
         status: "fail",
-        message: `Firestore: [${err.code || "UNKNOWN"}] ${err.message}${hint}`,
+        message: `Firestore: [${code}] ${getErrorMessage(err)}${hint}`,
         durationMs: Math.round(performance.now() - t2),
       });
     }
 
-    // ── Teste 4: Realtime Database ────────────────────────────
+    // ── Teste 4: Histórico ────────────────────────────────────
     const t3 = performance.now();
     try {
-      const rtdb = getRtdb();
-      const testRef = dbRef(rtdb, "_connection_test/ping");
-      await dbSet(testRef, {
-        ok: true,
-        timestamp: Date.now(),
-        source: "firebase-test-page",
-      });
-      const snap = await dbGet(testRef);
-      if (snap.exists() && snap.val()?.ok === true) {
-        await dbRemove(testRef);
+      if (!auth?.currentUser) {
+        throw new Error("Inicie sessão para testar o Histórico protegido.");
+      }
+
+      const profileSnap = await getDoc(doc(firestore, "users", auth.currentUser.uid));
+      if (!profileSnap.exists() || profileSnap.data()?.role !== "admin") {
+        throw new Error("O teste do Histórico exige role 'admin' em users/{UID}.");
+      }
+
+      const testActivityRef = doc(
+        firestore,
+        "activity_log",
+        "firebase-test-" + crypto.randomUUID(),
+      );
+      try {
+        await setDoc(testActivityRef, {
+          action: "firebase_test",
+          entity_type: "diagnostic",
+          entity_name: "Firebase connection test",
+          created_at: Date.now(),
+        });
+        const snap = await getDoc(testActivityRef);
+        if (!snap.exists() || snap.data()?.action !== "firebase_test") {
+          throw new Error("O registo do Histórico não correspondeu ao registo escrito.");
+        }
         updateResult(3, {
           status: "pass",
-          message: "Realtime DB: write → read → delete — tudo OK ✅",
+          message: "activity_log: write → read → delete — tudo OK ✅",
           durationMs: Math.round(performance.now() - t3),
         });
-      } else {
-        updateResult(3, {
-          status: "fail",
-          message: "Realtime DB: escrita ok mas leitura não correspondeu.",
-          durationMs: Math.round(performance.now() - t3),
-        });
+      } finally {
+        await deleteDoc(testActivityRef).catch(() => undefined);
       }
-    } catch (err: any) {
-      const hint =
-        err.code === "PERMISSION_DENIED"
-          ? " → Verifique as regras do Realtime Database."
-          : !app.options.databaseURL
-            ? " → VITE_FIREBASE_DATABASE_URL não está definido no .env"
-            : "";
+    } catch (err: unknown) {
       updateResult(3, {
         status: "fail",
-        message: `Realtime DB: [${err.code || "UNKNOWN"}] ${err.message}${hint}`,
+        message: `Histórico: ${getErrorMessage(err)}`,
         durationMs: Math.round(performance.now() - t3),
       });
     }
@@ -225,20 +228,33 @@ function FirebaseTestPage() {
     // ── Teste 5: Storage ──────────────────────────────────────
     const t4 = performance.now();
     try {
+      if (!auth?.currentUser) {
+        throw new Error("Inicie sessão para testar o Storage protegido.");
+      }
       const testStorRef = storageRef(
         storage,
-        "_connection_test/ping.txt"
+        "_connection_test/" + auth.currentUser.uid + "/" + crypto.randomUUID() + ".txt",
       );
-      const bucket = storage.app.options.storageBucket || "não configurado";
-      updateResult(4, {
-        status: "pass",
-        message: `Storage pronto — bucket: ${bucket} | ref: ${testStorRef.fullPath}`,
-        durationMs: Math.round(performance.now() - t4),
-      });
-    } catch (err: any) {
+      const body = "Prudencio Firebase connection test";
+      try {
+        await uploadBytes(testStorRef, new Blob([body], { type: "text/plain" }));
+        const downloadResponse = await fetch(await getDownloadURL(testStorRef));
+        if (!downloadResponse.ok || (await downloadResponse.text()) !== body) {
+          throw new Error("O ficheiro enviado não corresponde ao ficheiro lido.");
+        }
+        const bucket = storage.app.options.storageBucket || "não configurado";
+        updateResult(4, {
+          status: "pass",
+          message: "Storage: upload → download → delete — tudo OK | bucket: " + bucket,
+          durationMs: Math.round(performance.now() - t4),
+        });
+      } finally {
+        await deleteObject(testStorRef).catch(() => undefined);
+      }
+    } catch (err: unknown) {
       updateResult(4, {
         status: "fail",
-        message: `Storage: ${err.message}`,
+        message: `Storage: ${getErrorMessage(err)}`,
         durationMs: Math.round(performance.now() - t4),
       });
     }
@@ -277,9 +293,7 @@ function FirebaseTestPage() {
     }
   };
 
-  const allPassed =
-    results.length > 0 && results.every((r) => r.status === "pass");
-  const hasFailed = results.some((r) => r.status === "fail");
+  const allPassed = results.length > 0 && results.every((r) => r.status === "pass");
   const passCount = results.filter((r) => r.status === "pass").length;
   const failCount = results.filter((r) => r.status === "fail").length;
 
@@ -303,8 +317,7 @@ function FirebaseTestPage() {
             <span className="text-white/70 font-mono">
               {app.options.projectId || "não configurado"}
             </span>{" "}
-            — Project Number:{" "}
-            <span className="text-white/70 font-mono">37827545233</span>
+            — Project Number: <span className="text-white/70 font-mono">37827545233</span>
           </p>
         </div>
 
@@ -319,8 +332,11 @@ function FirebaseTestPage() {
               ["authDomain", app.options.authDomain],
               ["storageBucket", app.options.storageBucket],
               ["messagingSenderId", app.options.messagingSenderId],
-              ["apiKey", app.options.apiKey ? "••••" + (app.options.apiKey as string).slice(-6) : "⚠️ VAZIO"],
-              ["appId", app.options.appId ? "••••" + (app.options.appId as string).slice(-8) : "⚠️ VAZIO"],
+              ["apiKey", app.options.apiKey ? "configurada" : "⚠️ VAZIO"],
+              [
+                "appId",
+                app.options.appId ? "••••" + (app.options.appId as string).slice(-8) : "⚠️ VAZIO",
+              ],
               ["databaseURL", app.options.databaseURL || "não definido"],
             ].map(([key, val]) => (
               <div
@@ -330,9 +346,7 @@ function FirebaseTestPage() {
                 <span className="text-white/40 font-mono">{key}</span>
                 <span
                   className={`font-mono ${
-                    String(val).includes("VAZIO")
-                      ? "text-amber-400"
-                      : "text-emerald-400"
+                    String(val).includes("VAZIO") ? "text-amber-400" : "text-emerald-400"
                   }`}
                 >
                   {val}
@@ -377,13 +391,9 @@ function FirebaseTestPage() {
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2.5">
                     <span className="text-lg">{r.icon}</span>
-                    <span className="text-sm font-semibold text-white">
-                      {r.name}
-                    </span>
+                    <span className="text-sm font-semibold text-white">{r.name}</span>
                     {r.durationMs !== undefined && (
-                      <span className="text-xs text-white/30 font-mono">
-                        {r.durationMs}ms
-                      </span>
+                      <span className="text-xs text-white/30 font-mono">{r.durationMs}ms</span>
                     )}
                   </div>
                   {statusBadge(r.status)}
@@ -410,16 +420,15 @@ function FirebaseTestPage() {
                   Firebase Conectado com Sucesso!
                 </h2>
                 <p className="text-sm text-emerald-300/60 mt-1">
-                  Todos os {results.length} serviços estão operacionais. Já podes
-                  remover esta página de teste.
+                  Todos os {results.length} serviços estão operacionais. Já podes remover esta
+                  página de teste.
                 </p>
               </div>
             ) : (
               <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-6 text-center">
                 <div className="text-4xl mb-2">⚠️</div>
                 <h2 className="text-xl font-bold text-red-400">
-                  {failCount} teste{failCount > 1 ? "s" : ""} falharam,{" "}
-                  {passCount} passaram
+                  {failCount} teste{failCount > 1 ? "s" : ""} falharam, {passCount} passaram
                 </h2>
                 <div className="text-sm text-red-300/80 mt-3 text-left space-y-1.5">
                   <p>
@@ -427,20 +436,16 @@ function FirebaseTestPage() {
                   </p>
                   <ol className="list-decimal list-inside space-y-1 text-xs">
                     <li>
-                      Verifica que colaste <code className="text-amber-400">VITE_FIREBASE_API_KEY</code> e{" "}
+                      Verifica que colaste{" "}
+                      <code className="text-amber-400">VITE_FIREBASE_API_KEY</code> e{" "}
                       <code className="text-amber-400">VITE_FIREBASE_APP_ID</code> no ficheiro{" "}
                       <code>.env</code>
                     </li>
                     <li>
-                      Na consola Firebase, ativa os serviços que falharam
-                      (Firestore, Realtime DB, Storage)
+                      Na consola Firebase, ativa os serviços que falharam (Firestore e Storage)
                     </li>
                     <li>
-                      Se Firestore falhar com "permission-denied", define regras
-                      temporárias:{" "}
-                      <code className="text-amber-400">
-                        {"allow read, write: if true;"}
-                      </code>
+                      Se houver "permission-denied", publique as regras seguras do projeto Firebase.
                     </li>
                     <li>Reinicia o dev server após alterar o .env</li>
                   </ol>

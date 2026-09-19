@@ -35,6 +35,9 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+service-account*.json
+firebase-adminsdk*.json
+firebase-debug.log
 
 # Databases
 *.sqlite

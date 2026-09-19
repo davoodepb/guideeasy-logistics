@@ -6,6 +6,8 @@
  *   A:NIF_EMITENTE*B:NIF_ADQUIRENTE*C:PT*D:GT*E:N*F:20260505*G:GT GT.2026/67*H:ATCUD*...*Q:HASH*R:CERT
  */
 
+import type { PDFDocumentProxy } from "pdfjs-dist";
+
 export type QRResult = {
   raw: string;
   atCode: string;
@@ -18,13 +20,21 @@ export type QRResult = {
   confidence: number;
 };
 
-export async function extractQRFromPdf(pdfDoc: any, pdfjs: any): Promise<QRResult[]> {
+type QRDecoder = (
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  options: { inversionAttempts: "attemptBoth" },
+) => { data: string } | null;
+
+export async function extractQRFromPdf(pdfDoc: PDFDocumentProxy): Promise<QRResult[]> {
   const results: QRResult[] = [];
 
-  let jsQR: any;
+  let jsQR: QRDecoder;
   try {
-    const mod = await import("jsqr");
-    jsQR = mod.default || mod;
+    const mod = (await import("jsqr")) as unknown as { default?: QRDecoder };
+    if (!mod.default) throw new Error("jsqr export not found");
+    jsQR = mod.default;
   } catch {
     console.warn("[QR] jsqr not installed — skipping");
     return results;
@@ -52,7 +62,7 @@ export async function extractQRFromPdf(pdfDoc: any, pdfjs: any): Promise<QRResul
 
         // Strategy 1: Scan full page
         const fullData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        let code = jsQR(fullData.data, fullData.width, fullData.height, {
+        const code = jsQR(fullData.data, fullData.width, fullData.height, {
           inversionAttempts: "attemptBoth",
         });
 
@@ -109,7 +119,9 @@ export async function extractQRFromPdf(pdfDoc: any, pdfjs: any): Promise<QRResul
                 found = true;
               }
             }
-          } catch {}
+          } catch {
+            continue;
+          }
         }
 
         canvas.width = 0;

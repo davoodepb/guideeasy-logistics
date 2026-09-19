@@ -1,84 +1,73 @@
-# Prudêncio — Sistema de Gestão de Guias de Transporte (PWA)
+# Prudêncio — Gestão de Guias de Transporte
 
-Aplicação **PWA** completa para gestão de guias de transporte e obras, com suporte a upload de PDFs, extração OCR/QR Code, exportação para Excel e controlo de checklists.
+PWA para gestão de guias de transporte e obras. A aplicação usa Firebase como backend.
 
----
+## Serviços Firebase
 
-## 🔥 Backend: Firebase Firestore
+- Firebase Authentication para login, logout e persistência de sessão.
+- Cloud Firestore para obras, checklists, perfis e histórico.
+- Firebase Storage para ficheiros quando o fluxo de ficheiros estiver ativo.
 
-O projeto utiliza exclusivamente o **Firebase Firestore** como base de dados. Toda a persistência de dados (obras, checklists, utilizadores) é feita através do Firebase.
+## Configuração local
 
-### Arquitetura:
-- **Firebase Client SDK** — CRUD de dados (obras, checklists) diretamente via Firestore
-- **Firestore REST API** — Autenticação server-side (leitura de utilizadores)
-- **JWT + Cookies HTTP-only** — Gestão de sessões
-- **bcryptjs** — Hash de passwords
+1. Instale as dependências:
 
----
+   ```powershell
+   npm install
+   ```
 
-## 📋 Variáveis de Ambiente
+2. Copie `.env.example` para `.env.local`.
 
-Crie um ficheiro `.env` baseado no `.env.example`:
+3. Preencha os valores da aplicação Web Firebase no `.env.local`.
 
-| Variável | Descrição | Obrigatório |
-|----------|-----------|-------------|
-| `JWT_SECRET` | Chave secreta para tokens JWT | ✅ Sim |
-| `ADMIN_EMAIL` | Email do administrador (padrão: `admin@prudencio.pt`) | ✅ Sim |
-| `ADMIN_PASSWORD` | Password do administrador (padrão: `Rpavg5n`) | ✅ Sim |
-| `ADMIN_NAME` | Nome do administrador (padrão: `Administrador`) | Não |
-| `FIREBASE_SERVICE_ACCOUNT` | JSON da Service Account (para acesso server-side avançado) | Não |
+4. No Firebase Console, inicialize **Storage** em Storage > Get started.
 
----
+5. No Firebase Console, ative o fornecedor **Email/Password** em Authentication.
 
-## 💻 Desenvolvimento Local
+6. Crie o primeiro utilizador em Authentication. Depois crie o documento
+   `users/{uid}` no Firestore com `name` e `role` (`admin` ou `operator`).
 
-```bash
-# 1. Instalar dependências
-npm install
+7. Inicie a aplicação:
 
-# 2. Configurar variáveis de ambiente
-cp .env.example .env
-# Editar .env com os valores corretos
+   ```powershell
+   npm run dev
+   ```
 
-# 3. Iniciar servidor de desenvolvimento
-npm run dev
+A aplicação fica disponível em `http://127.0.0.1:8433`.
 
-# 4. Aceder à aplicação
-# http://localhost:8433
+Não coloque palavras-passe, tokens, chaves privadas ou ficheiros de Service Account no repositório.
+
+## Diagnóstico Firebase
+
+Abra `/firebase-test` depois de iniciar sessão. A página verifica:
+
+- configuração do Firebase Web SDK;
+- inicialização do Firebase Authentication;
+- escrita, leitura e remoção de um documento temporário no Firestore;
+- upload, download e remoção de um ficheiro temporário no Storage.
+
+Os testes de dados precisam de uma sessão Firebase válida. Os artefactos de teste são removidos no fim.
+
+## Desenvolvimento e validação
+
+```powershell
+npm run lint
+npm run build
 ```
 
-### Credenciais de Login:
-- **Email:** `admin@prudencio.pt`
-- **Password:** `Rpavg5n`
+Para publicar as regras depois de autenticar a Firebase CLI:
 
----
+```powershell
+firebase deploy --only firestore:rules,storage
+```
 
-## 🚀 Deploy na Vercel
+## Stack
 
-1. Push para o GitHub
-2. Criar projeto na Vercel e importar o repositório
-3. Configurar variáveis de ambiente (`JWT_SECRET`, credenciais admin)
-4. Deploy automático — build em ~40 segundos
-
----
-
-## 📱 PWA
-
-A aplicação é uma Progressive Web App instalável:
-- **Manifest** configurado com ícones e shortcuts
-- **Service Worker** com estratégia network-first e cache fallback
-- **Modo standalone** para experiência nativa
-- **Suporte offline** para conteúdo em cache
-
----
-
-## 🛠️ Stack Tecnológica
-
-| Camada | Tecnologia |
-|--------|-----------|
-| Frontend | React 19 + TanStack Router + shadcn/ui + Tailwind CSS 4 |
-| Backend | TanStack Start (SSR) + Nitro |
-| Base de Dados | Firebase Firestore |
-| Autenticação | JWT customizado + bcryptjs |
-| Build | Vite 7 |
-| Deploy | Vercel |
+| Camada               | Tecnologia                                  |
+| -------------------- | ------------------------------------------- |
+| Interface            | React 19 + TanStack Router + Tailwind CSS 4 |
+| Backend de aplicação | TanStack Start + Nitro                      |
+| Base de dados        | Cloud Firestore                             |
+| Autenticação         | Firebase Authentication                     |
+| Ficheiros            | Firebase Storage                            |
+| Build                | Vite 7                                      |

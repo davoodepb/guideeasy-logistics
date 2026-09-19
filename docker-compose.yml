@@ -1,17 +1,22 @@
-# ═══════════════════════════════════════════════════════════════
-# GuidEasy Logistics — Docker Compose (Firebase Edition)
-# Apenas a aplicação — dados armazenados no Firebase Firestore.
-#   docker compose up -d
-# ═══════════════════════════════════════════════════════════════
+# Prudêncio — Docker Compose
+# A configuração VITE_* é aplicada durante o build do cliente.
 
 services:
   app:
-    build: .
+    build:
+      context: .
+      args:
+        VITE_FIREBASE_API_KEY: ${VITE_FIREBASE_API_KEY:-}
+        VITE_FIREBASE_AUTH_DOMAIN: ${VITE_FIREBASE_AUTH_DOMAIN:-}
+        VITE_FIREBASE_DATABASE_URL: ${VITE_FIREBASE_DATABASE_URL:-}
+        VITE_FIREBASE_PROJECT_ID: ${VITE_FIREBASE_PROJECT_ID:-}
+        VITE_FIREBASE_STORAGE_BUCKET: ${VITE_FIREBASE_STORAGE_BUCKET:-}
+        VITE_FIREBASE_MESSAGING_SENDER_ID: ${VITE_FIREBASE_MESSAGING_SENDER_ID:-}
+        VITE_FIREBASE_APP_ID: ${VITE_FIREBASE_APP_ID:-}
+        VITE_FIREBASE_MEASUREMENT_ID: ${VITE_FIREBASE_MEASUREMENT_ID:-}
     restart: unless-stopped
     ports:
       - "${PORT:-3000}:3000"
     environment:
-      FIREBASE_SERVICE_ACCOUNT: ${FIREBASE_SERVICE_ACCOUNT}
-      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET no ficheiro .env}
       NODE_ENV: production
       PORT: 3000

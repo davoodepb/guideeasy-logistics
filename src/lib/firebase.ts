@@ -6,24 +6,13 @@
  * Este ficheiro:
  *  1. Inicializa o Firebase App (singleton, seguro para SSR)
  *  2. Exporta instâncias prontas de Auth, Firestore e Storage
- *  3. RTDB disponível via databaseURL configurado
+ *  3. Mantém databaseURL apenas para compatibilidade com a configuração do projeto
  *  4. Todo o CRUD de Checklists, Obras e Users (Firestore)
  * ═══════════════════════════════════════════════════════════════
  */
 
 import { initializeApp, getApps, getApp } from "firebase/app";
-import type { FirebaseApp } from "firebase/app";
-import {
-  getDatabase,
-  ref,
-  push,
-  set,
-  get,
-  child,
-  update,
-  remove,
-} from "firebase/database";
-import type { Database } from "firebase/database";
+import type { FirebaseApp, FirebaseOptions } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import type { Auth } from "firebase/auth";
 import {
@@ -37,37 +26,64 @@ import {
   getDocs,
   updateDoc,
   deleteDoc,
+  setDoc,
   query,
   orderBy,
-  where,
-  limit,
-  serverTimestamp,
 } from "firebase/firestore";
 import type { Firestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import type { FirebaseStorage } from "firebase/storage";
 
-// ─── Configuração Firebase (projeto n8n-prudencio) ──────────────────
-const firebaseConfig = {
-  apiKey: "AIzaSyClBw569jLYXKWL6lr5hYl-3ppCT7_PzJg",
-  authDomain: "n8n-prudencio.firebaseapp.com",
-  databaseURL: "https://n8n-prudencio-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "n8n-prudencio",
-  storageBucket: "n8n-prudencio.firebasestorage.app",
-  messagingSenderId: "397008230620",
-  appId: "1:397008230620:web:a17568b43bca763719bc19",
-  measurementId: "G-EJEFSVQHLD",
+// ─── Configuração Firebase ────────────────────────────────────────────
+// A chave Web é pública, mas continua fora do repositório para permitir
+// configuração diferente por ambiente e para evitar credenciais hardcoded.
+function envValue(name: string): string {
+  const value = import.meta.env[name] as string | undefined;
+  return typeof value === "string" ? value.trim() : "";
+}
+
+const firebaseConfig: FirebaseOptions = {
+  apiKey: envValue("VITE_FIREBASE_API_KEY"),
+  authDomain: envValue("VITE_FIREBASE_AUTH_DOMAIN") || "n8n-prudencio.firebaseapp.com",
+  databaseURL:
+    envValue("VITE_FIREBASE_DATABASE_URL") ||
+    "https://n8n-prudencio-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: envValue("VITE_FIREBASE_PROJECT_ID") || "n8n-prudencio",
+  storageBucket: envValue("VITE_FIREBASE_STORAGE_BUCKET") || "n8n-prudencio.firebasestorage.app",
+  messagingSenderId: envValue("VITE_FIREBASE_MESSAGING_SENDER_ID") || "397008230620",
+  appId: envValue("VITE_FIREBASE_APP_ID") || "1:397008230620:web:a17568b43bca763719bc19",
+  measurementId: envValue("VITE_FIREBASE_MEASUREMENT_ID") || "G-EJEFSVQHLD",
+};
+
+const requiredConfigFields: Array<keyof FirebaseOptions> = [
+  "apiKey",
+  "authDomain",
+  "projectId",
+  "storageBucket",
+  "messagingSenderId",
+  "appId",
+];
+
+export const firebaseConfigStatus = {
+  configured: requiredConfigFields.every((field) => Boolean(firebaseConfig[field])),
+  missing: requiredConfigFields.filter((field) => !firebaseConfig[field]),
 };
 
 // ─── Singleton App ───────────────────────────────────────────────────
-export const app: FirebaseApp = getApps().length
-  ? getApp()
-  : initializeApp(firebaseConfig);
+export const app: FirebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 // ─── Serviços Prontos a Usar ─────────────────────────────────────────
 
-/** Firebase Authentication */
-export const auth: Auth = getAuth(app);
+/** Firebase Authentication. Fica nulo quando a configuração local está incompleta. */
+export const auth: Auth | null = (() => {
+  if (!firebaseConfigStatus.configured) return null;
+  try {
+    return getAuth(app);
+  } catch (error) {
+    console.warn("Firebase Authentication não foi inicializado:", error);
+    return null;
+  }
+})();
 
 /** Cloud Firestore (com cache local persistente para offline) */
 export const firestore: Firestore = (() => {
@@ -82,23 +98,6 @@ export const firestore: Firestore = (() => {
     return getFirestore(app);
   }
 })();
-
-/** Realtime Database */
-let _db: Database | null = null;
-export function getRtdb(): Database {
-  if (_db) return _db;
-  _db = getDatabase(app);
-  return _db;
-}
-
-// Exportar `db` como getter lazy para compatibilidade
-export const db: Database = new Proxy({} as Database, {
-  get(_target, prop, receiver) {
-    const realDb = getRtdb();
-    const value = Reflect.get(realDb, prop, receiver);
-    return typeof value === "function" ? value.bind(realDb) : value;
-  },
-});
 
 /** Cloud Storage (para ficheiros/PDFs) */
 export const storage: FirebaseStorage = getStorage(app);
@@ -183,11 +182,13 @@ export type Checklist = {
 
 const checklistsCol = () => collection(firestore, "checklists");
 
-export async function createChecklist(
-  c: Omit<Checklist, "id">
-): Promise<string> {
-  const docRef = await addDoc(checklistsCol(), { ...c, created_at: c.created_at || Date.now() });
-  await updateDoc(docRef, { id: docRef.id });
+export async function createChecklist(c: Omit<Checklist, "id">): Promise<string> {
+  const docRef = doc(checklistsCol());
+  await setDoc(docRef, {
+    ...c,
+    id: docRef.id,
+    created_at: c.created_at || Date.now(),
+  });
   return docRef.id;
 }
 
@@ -197,16 +198,11 @@ export async function getChecklist(id: string): Promise<Checklist | null> {
 }
 
 export async function listChecklists(): Promise<Checklist[]> {
-  try {
-    const q = query(checklistsCol(), orderBy("created_at", "desc"));
-    const snap = await getDocs(q);
-    return snap.docs
-      .filter((d) => d.id !== "placeholder")
-      .map((d) => ({ id: d.id, ...d.data() } as Checklist));
-  } catch (e) {
-    console.warn("listChecklists falhou (verifique regras Firestore):", e);
-    return [];
-  }
+  const q = query(checklistsCol(), orderBy("created_at", "desc"));
+  const snap = await getDocs(q);
+  return snap.docs
+    .filter((d) => d.id !== "placeholder")
+    .map((d) => ({ id: d.id, ...d.data() }) as Checklist);
 }
 
 export async function updateChecklist(id: string, patch: Partial<Checklist>) {
@@ -228,22 +224,21 @@ export async function deleteAllChecklists(): Promise<void> {
 const obrasCol = () => collection(firestore, "obras");
 
 export async function createObra(o: Omit<Obra, "id">): Promise<string> {
-  const docRef = await addDoc(obrasCol(), { ...o, created_at: o.created_at || Date.now() });
-  await updateDoc(docRef, { id: docRef.id });
+  const docRef = doc(obrasCol());
+  await setDoc(docRef, {
+    ...o,
+    id: docRef.id,
+    created_at: o.created_at || Date.now(),
+  });
   return docRef.id;
 }
 
 export async function listObras(): Promise<Obra[]> {
-  try {
-    const q = query(obrasCol(), orderBy("created_at", "desc"));
-    const snap = await getDocs(q);
-    return snap.docs
-      .filter((d) => d.id !== "placeholder")
-      .map((d) => ({ id: d.id, ...d.data() } as Obra));
-  } catch (e) {
-    console.warn("listObras falhou:", e);
-    return [];
-  }
+  const q = query(obrasCol(), orderBy("created_at", "desc"));
+  const snap = await getDocs(q);
+  return snap.docs
+    .filter((d) => d.id !== "placeholder")
+    .map((d) => ({ id: d.id, ...d.data() }) as Obra);
 }
 
 export async function getObra(id: string): Promise<Obra | null> {
@@ -262,15 +257,11 @@ export async function deleteObra(id: string): Promise<void> {
 // ─── Utilitários ─────────────────────────────────────────────────────
 
 export async function logUser(name: string, phone: string) {
-  try {
-    await addDoc(collection(firestore, "app_users"), {
-      name,
-      phone,
-      created_at: Date.now(),
-    });
-  } catch (e) {
-    console.warn("logUser falhou (regras Firebase):", e);
-  }
+  await addDoc(collection(firestore, "app_users"), {
+    name,
+    phone,
+    created_at: Date.now(),
+  });
 }
 
 // ─── Firestore CRUD (Histórico / Activity Log) ──────────────────────
@@ -289,26 +280,20 @@ export type ActivityLog = {
 
 const activityCol = () => collection(firestore, "activity_log");
 
-export async function createActivityLog(
-  log: Omit<ActivityLog, "id">
-): Promise<string> {
-  const docRef = await addDoc(activityCol(), {
+export async function createActivityLog(log: Omit<ActivityLog, "id">): Promise<string> {
+  const docRef = doc(activityCol());
+  await setDoc(docRef, {
     ...log,
+    id: docRef.id,
     created_at: log.created_at || Date.now(),
   });
-  await updateDoc(docRef, { id: docRef.id });
   return docRef.id;
 }
 
 export async function listActivityLogs(): Promise<ActivityLog[]> {
-  try {
-    const q = query(activityCol(), orderBy("created_at", "desc"));
-    const snap = await getDocs(q);
-    return snap.docs.map((d) => ({ id: d.id, ...d.data() } as ActivityLog));
-  } catch (e) {
-    console.warn("listActivityLogs falhou:", e);
-    return [];
-  }
+  const q = query(activityCol(), orderBy("created_at", "desc"));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as ActivityLog);
 }
 
 export async function deleteActivityLog(id: string): Promise<void> {

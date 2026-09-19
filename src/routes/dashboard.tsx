@@ -64,10 +64,11 @@ function Dashboard() {
         setItems(guias);
         setObras(o);
       })
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         console.warn("Erro ao carregar dados do dashboard:", err);
         let msg = "Não foi possível carregar os dados das guias e obras.";
-        if (err.message && err.message.toLowerCase().includes("permission_denied")) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        if (errorMessage.toLowerCase().includes("permission_denied")) {
           msg = "Acesso recusado: Não tem permissão para aceder aos dados de guias/obras.";
         }
         toast.error(msg);

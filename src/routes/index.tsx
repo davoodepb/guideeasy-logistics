@@ -84,7 +84,7 @@ function LoginPage() {
       localStorage.removeItem("login_cooldown_until");
       toast.success("Acesso autorizado.");
       navigate({ to: "/dashboard" });
-    } catch (err: any) {
+    } catch (err: unknown) {
       const nextAttempts = attempts + 1;
       setAttempts(nextAttempts);
       localStorage.setItem("login_attempts", String(nextAttempts));
@@ -96,7 +96,9 @@ function LoginPage() {
         toast.error("Número máximo de tentativas falhadas atingido. Bloqueado por 15 minutos.");
       } else {
         const friendlyMessage =
-          err?.message || "E-mail ou palavra-passe incorretos. Tente novamente.";
+          err instanceof Error
+            ? err.message
+            : "E-mail ou palavra-passe incorretos. Tente novamente.";
         toast.error(friendlyMessage);
       }
       setPassword("");

@@ -44,6 +44,7 @@ function HistoricoPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showDeleteAll, setShowDeleteAll] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -60,11 +61,23 @@ function HistoricoPage() {
 
   function loadLogs() {
     setLoading(true);
+    setLoadError(null);
     listActivityLogsStore()
       .then((data) => setLogs(data))
-      .catch((err) => {
-        console.warn("Erro ao carregar histórico:", err);
-        toast.error("Não foi possível carregar o histórico.");
+      .catch((error: unknown) => {
+        const code =
+          error && typeof error === "object" && "code" in error
+            ? String((error as { code?: unknown }).code)
+            : "";
+        const message = error instanceof Error ? error.message : String(error);
+        const permissionDenied =
+          code === "permission-denied" || message.toLowerCase().includes("permission");
+        const friendlyMessage = permissionDenied
+          ? "Acesso recusado. A conta precisa de role 'admin' no documento Firestore users/{UID}."
+          : "Não foi possível carregar o histórico. Tente novamente.";
+        console.warn("Erro ao carregar histórico:", error);
+        setLoadError(friendlyMessage);
+        toast.error(friendlyMessage);
       })
       .finally(() => setLoading(false));
   }
@@ -116,14 +129,7 @@ function HistoricoPage() {
     const ws = XLSX.utils.json_to_sheet(data);
 
     // Ajustar largura das colunas
-    ws["!cols"] = [
-      { wch: 20 },
-      { wch: 20 },
-      { wch: 15 },
-      { wch: 30 },
-      { wch: 25 },
-      { wch: 40 },
-    ];
+    ws["!cols"] = [{ wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 30 }, { wch: 25 }, { wch: 40 }];
 
     XLSX.utils.book_append_sheet(wb, ws, "Histórico");
 
@@ -255,6 +261,17 @@ function HistoricoPage() {
             <div className="size-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
             A carregar histórico...
           </div>
+        ) : loadError ? (
+          <div className="text-center py-12 text-red-700">
+            <AlertTriangle className="size-12 mx-auto mb-3 opacity-70" />
+            <p className="font-semibold">{loadError}</p>
+            <button
+              onClick={loadLogs}
+              className="mt-4 h-10 px-5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition"
+            >
+              Tentar novamente
+            </button>
+          </div>
         ) : filteredLogs.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             <FileText className="size-12 mx-auto mb-3 opacity-30" />
@@ -268,10 +285,7 @@ function HistoricoPage() {
         ) : (
           <div className="space-y-2">
             {filteredLogs.map((log) => (
-              <div
-                key={log.id}
-                className="bg-card border rounded-xl p-4 flex items-start gap-3"
-              >
+              <div key={log.id} className="bg-card border rounded-xl p-4 flex items-start gap-3">
                 <div className="size-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0 mt-0.5">
                   {actionIcon(log.action)}
                 </div>
@@ -318,9 +332,7 @@ function HistoricoPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Apagar registo?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta ação não pode ser revertida.
-            </AlertDialogDescription>
+            <AlertDialogDescription>Esta ação não pode ser revertida.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -344,8 +356,8 @@ function HistoricoPage() {
               Apagar todo o histórico?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Todos os {logs.length} registos serão permanentemente eliminados.
-              Esta ação não pode ser revertida.
+              Todos os {logs.length} registos serão permanentemente eliminados. Esta ação não pode
+              ser revertida.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -376,6 +388,7 @@ function actionLabel(action: string): string {
     editar_obra: "Obra Editada",
     terminar_obra: "Obra Terminada",
     apagar_obra: "Obra Apagada",
+    criar_utilizador: "Utilizador Criado",
     login: "Login",
     logout: "Logout",
     exportar_excel: "Exportação Excel",
@@ -386,7 +399,6 @@ function actionLabel(action: string): string {
 
 function actionIcon(action: string) {
   if (action.includes("apagar")) return <Trash2 className="size-4" />;
-  if (action.includes("login") || action.includes("logout"))
-    return <User className="size-4" />;
+  if (action.includes("login") || action.includes("logout")) return <User className="size-4" />;
   return <FileText className="size-4" />;
 }

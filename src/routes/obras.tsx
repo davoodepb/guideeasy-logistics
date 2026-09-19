@@ -42,6 +42,7 @@ function ObrasPage() {
   const [nomeError, setNomeError] = useState("");
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -55,8 +56,24 @@ function ObrasPage() {
 
   function load() {
     setLoading(true);
+    setLoadError(null);
     listObrasStore()
-      .then(setObras)
+      .then((data) => setObras(data))
+      .catch((error: unknown) => {
+        const code =
+          error && typeof error === "object" && "code" in error
+            ? String((error as { code?: unknown }).code)
+            : "";
+        const message = error instanceof Error ? error.message : String(error);
+        const permissionDenied =
+          code === "permission-denied" || message.toLowerCase().includes("permission");
+        const friendlyMessage = permissionDenied
+          ? "Acesso recusado. Inicie sessão com Firebase Authentication e confirme as regras do Firestore."
+          : "Não foi possível carregar as obras. Tente novamente.";
+        console.warn("Erro ao carregar obras:", error);
+        setLoadError(friendlyMessage);
+        toast.error(friendlyMessage);
+      })
       .finally(() => setLoading(false));
   }
 
@@ -158,6 +175,17 @@ function ObrasPage() {
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="size-6 animate-spin text-primary" />
+          </div>
+        ) : loadError ? (
+          <div className="bg-card rounded-2xl border border-red-200 p-10 text-center">
+            <AlertTriangle className="size-10 text-red-500 mx-auto opacity-80" />
+            <p className="mt-3 text-sm font-semibold text-red-700">{loadError}</p>
+            <button
+              onClick={load}
+              className="mt-4 h-10 px-5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold inline-flex items-center gap-2 hover:opacity-90 transition"
+            >
+              Tentar novamente
+            </button>
           </div>
         ) : filtered.length === 0 && searchTerm ? (
           <div className="bg-card rounded-2xl border border-dashed p-10 text-center">

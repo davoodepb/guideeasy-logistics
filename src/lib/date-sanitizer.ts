@@ -7,7 +7,7 @@
 export interface DateSanitizationResult {
   isValid: boolean;
   convertedDate: string; // Formato DD/MM/AAAA se for válido
-  originalValue: any;
+  originalValue: unknown;
   error?: string; // Detalhes do erro se for inválido
   parsedComponents?: {
     day: number;
@@ -22,7 +22,7 @@ export interface BatchValidationResult {
   invalidCount: number;
   detectedFormatPattern: "US_PROBABLE" | "EU_PROBABLE" | "MIXED_OR_AMBIGUOUS" | "UNKNOWN";
   results: DateSanitizationResult[];
-  errorsSummary: { rowIndex: number; value: any; error: string }[];
+  errorsSummary: { rowIndex: number; value: unknown; error: string }[];
 }
 
 /**
@@ -74,7 +74,7 @@ export function formatToPTDate(date: Date): string {
  * @param value Qualquer entrada de data (String, Date, Número Serial do Excel)
  * @returns DateSanitizationResult contendo o estado da conversão e o valor sanitizado
  */
-export function sanitizeAndConvertUSDate(value: any): DateSanitizationResult {
+export function sanitizeAndConvertUSDate(value: unknown): DateSanitizationResult {
   const result: DateSanitizationResult = {
     isValid: false,
     convertedDate: "",
@@ -154,8 +154,8 @@ export function sanitizeAndConvertUSDate(value: any): DateSanitizationResult {
     const year = parseInt(match[3], 10);
 
     return validateAndBuildResult(day, month, year, value, result);
-  } catch (err: any) {
-    result.error = `Erro inesperado no processamento: ${err.message || err}`;
+  } catch (err: unknown) {
+    result.error = `Erro inesperado no processamento: ${err instanceof Error ? err.message : String(err)}`;
     return result;
   }
 }
@@ -167,7 +167,7 @@ function validateAndBuildResult(
   day: number,
   month: number,
   year: number,
-  originalValue: any,
+  originalValue: unknown,
   result: DateSanitizationResult,
 ): DateSanitizationResult {
   // Validação do intervalo do ano
@@ -212,9 +212,12 @@ function validateAndBuildResult(
  * @param rows Lista de registos importados (ex: JSON obtido do Excel/CSV)
  * @param dateColumn Key da coluna que contém a data
  */
-export function validateImportedFileDates(rows: any[], dateColumn: string): BatchValidationResult {
+export function validateImportedFileDates(
+  rows: Record<string, unknown>[],
+  dateColumn: string,
+): BatchValidationResult {
   const results: DateSanitizationResult[] = [];
-  const errorsSummary: { rowIndex: number; value: any; error: string }[] = [];
+  const errorsSummary: { rowIndex: number; value: unknown; error: string }[] = [];
 
   let validCount = 0;
   let invalidCount = 0;
