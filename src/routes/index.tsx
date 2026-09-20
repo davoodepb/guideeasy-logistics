@@ -5,10 +5,10 @@ import { toast } from "sonner";
 import { InstallAppButton } from "@/components/InstallAppButton";
 import { Lock, Eye, EyeOff, Shield, Loader2 } from "lucide-react";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/")(({
   component: LoginPage,
   head: () => ({ meta: [{ title: "Acesso — Prudêncio" }] }),
-});
+}));
 
 function LoginPage() {
   const navigate = useNavigate();
@@ -18,41 +18,6 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [attempts, setAttempts] = useState(0);
-  const [cooldownTime, setCooldownTime] = useState<number | null>(null);
-
-  // Carregar tentativas do localStorage
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const savedAttempts = localStorage.getItem("login_attempts");
-      const savedCooldown = localStorage.getItem("login_cooldown_until");
-
-      if (savedAttempts) setAttempts(parseInt(savedAttempts, 10));
-      if (savedCooldown) {
-        const cooldownMs = parseInt(savedCooldown, 10);
-        if (cooldownMs > Date.now()) {
-          setCooldownTime(cooldownMs);
-        } else {
-          localStorage.removeItem("login_cooldown_until");
-        }
-      }
-    }
-  }, []);
-
-  // Timer do lockout
-  useEffect(() => {
-    if (cooldownTime === null) return;
-    const interval = setInterval(() => {
-      const remaining = cooldownTime - Date.now();
-      if (remaining <= 0) {
-        setCooldownTime(null);
-        setAttempts(0);
-        localStorage.removeItem("login_attempts");
-        localStorage.removeItem("login_cooldown_until");
-      }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [cooldownTime]);
 
   useEffect(() => {
     if (user) {
@@ -63,12 +28,6 @@ function LoginPage() {
   async function handle(e: React.FormEvent) {
     e.preventDefault();
 
-    if (cooldownTime && cooldownTime > Date.now()) {
-      const mins = Math.ceil((cooldownTime - Date.now()) / 60000);
-      toast.error(`Muitas tentativas falhadas. Tente novamente em ${mins} minuto(s).`);
-      return;
-    }
-
     if (!email.trim() || !password.trim()) {
       toast.error("Introduza o e-mail e a palavra-passe de acesso.");
       return;
@@ -77,38 +36,19 @@ function LoginPage() {
     setBusy(true);
     try {
       await login(email.trim(), password.trim());
-
-      // Sucesso
-      setAttempts(0);
-      localStorage.removeItem("login_attempts");
-      localStorage.removeItem("login_cooldown_until");
       toast.success("Acesso autorizado.");
       navigate({ to: "/dashboard" });
     } catch (err: unknown) {
-      const nextAttempts = attempts + 1;
-      setAttempts(nextAttempts);
-      localStorage.setItem("login_attempts", String(nextAttempts));
-
-      if (nextAttempts >= 5) {
-        const cooldownUntil = Date.now() + 15 * 60 * 1000; // 15 minutos
-        setCooldownTime(cooldownUntil);
-        localStorage.setItem("login_cooldown_until", String(cooldownUntil));
-        toast.error("Número máximo de tentativas falhadas atingido. Bloqueado por 15 minutos.");
-      } else {
-        const friendlyMessage =
-          err instanceof Error
-            ? err.message
-            : "E-mail ou palavra-passe incorretos. Tente novamente.";
-        toast.error(friendlyMessage);
-      }
+      const friendlyMessage =
+        err instanceof Error
+          ? err.message
+          : "E-mail ou palavra-passe incorretos. Tente novamente.";
+      toast.error(friendlyMessage);
       setPassword("");
     } finally {
       setBusy(false);
     }
   }
-
-  const isLocked = cooldownTime !== null && cooldownTime > Date.now();
-  const remainingMins = isLocked ? Math.ceil((cooldownTime! - Date.now()) / 60000) : 0;
 
   return (
     <main className="min-h-[100dvh] bg-gradient-to-br from-[#0a1628] via-[#0d1f3c] to-[#0a2540] px-5 py-10 flex flex-col relative overflow-hidden">
@@ -164,7 +104,7 @@ function LoginPage() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="exemplo@prudencio.pt"
                     autoComplete="email"
-                    disabled={isLocked || busy}
+                    disabled={busy}
                     className="h-13 w-full rounded-xl bg-white/[0.07] border border-white/10 pl-11 pr-4 text-white text-base outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/30 transition placeholder:text-white/20 disabled:opacity-40"
                   />
                 </div>
@@ -182,13 +122,13 @@ function LoginPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     autoComplete="current-password"
-                    disabled={isLocked || busy}
+                    disabled={busy}
                     className="h-13 w-full rounded-xl bg-white/[0.07] border border-white/10 pl-11 pr-12 text-white text-base outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/30 transition placeholder:text-white/20 disabled:opacity-40"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPwd(!showPwd)}
-                    disabled={isLocked || busy}
+                    disabled={busy}
                     className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-white/30 hover:text-white/60 transition disabled:opacity-40"
                     aria-label={showPwd ? "Ocultar palavra-passe" : "Mostrar palavra-passe"}
                   >
@@ -198,28 +138,19 @@ function LoginPage() {
               </div>
 
               <button
-                disabled={busy || isLocked}
+                disabled={busy}
                 className="w-full h-13 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 text-white font-semibold text-base hover:from-blue-500 hover:to-blue-400 active:scale-[0.98] transition-all disabled:opacity-60 shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2"
               >
                 {busy ? (
                   <>
                     <Loader2 className="size-5 animate-spin" /> A verificar...
                   </>
-                ) : isLocked ? (
-                  <>Bloqueado por {remainingMins}m</>
                 ) : (
                   <>
                     <Lock className="size-4" /> Entrar
                   </>
                 )}
               </button>
-
-              {attempts > 0 && !isLocked && (
-                <p className="text-xs text-red-400/80 text-center">
-                  {attempts} tentativa{attempts > 1 ? "s" : ""} falhada{attempts > 1 ? "s" : ""}.
-                  (Bloqueio automático às 5 falhas)
-                </p>
-              )}
             </form>
           </div>
 
