@@ -109,34 +109,39 @@ async function authenticateUser(
   email: string,
   password: string
 ): Promise<UserProfile> {
-  const bcrypt = (await import("bcryptjs")).default;
-
-  // 1. Tentar encontrar no Firestore
-  const firestoreUser = await findUserByEmail(email);
-  if (firestoreUser) {
-    const valid = await bcrypt.compare(password, firestoreUser.data.password_hash);
-    if (!valid) throw new Error("Email ou password incorretos");
-    return {
-      id: firestoreUser.id,
-      email: firestoreUser.data.email,
-      name: firestoreUser.data.name,
-      role: firestoreUser.data.role as UserRole,
-    };
-  }
-
-  // 2. Fallback: verificar contra credenciais admin do .env
+  // 1. PRIMEIRO: verificar contra credenciais admin do .env
+  //    Isto garante que o admin consegue SEMPRE entrar
   const adminEmail = (process.env.ADMIN_EMAIL || "admin@prudencio.pt").toLowerCase().trim();
   const adminPassword = process.env.ADMIN_PASSWORD || "Rpavg5n";
   const adminName = process.env.ADMIN_NAME || "Administrador";
 
   if (email.toLowerCase().trim() === adminEmail && password === adminPassword) {
-    console.log("[auth] Login via credenciais admin do .env (Firestore users nao acessivel)");
+    console.log("[auth] Login admin via .env OK");
     return {
       id: "admin-env",
       email: adminEmail,
       name: adminName,
       role: "admin",
     };
+  }
+
+  // 2. Tentar encontrar no Firestore (para outros utilizadores)
+  try {
+    const bcrypt = (await import("bcryptjs")).default;
+    const firestoreUser = await findUserByEmail(email);
+    if (firestoreUser && firestoreUser.data.password_hash) {
+      const valid = await bcrypt.compare(password, firestoreUser.data.password_hash);
+      if (valid) {
+        return {
+          id: firestoreUser.id,
+          email: firestoreUser.data.email,
+          name: firestoreUser.data.name,
+          role: firestoreUser.data.role as UserRole,
+        };
+      }
+    }
+  } catch (e) {
+    console.warn("[auth] Firestore lookup falhou:", e);
   }
 
   throw new Error("Email ou password incorretos");
