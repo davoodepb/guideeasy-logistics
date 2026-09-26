@@ -43,7 +43,7 @@ function envValue(name: string): string {
 }
 
 const firebaseConfig: FirebaseOptions = {
-  apiKey: envValue("VITE_FIREBASE_API_KEY"),
+  apiKey: envValue("VITE_FIREBASE_API_KEY") || "AIzaSyClBw569jLYXKWL6lr5hYl-3ppCT7_PzJg",
   authDomain: envValue("VITE_FIREBASE_AUTH_DOMAIN") || "n8n-prudencio.firebaseapp.com",
   databaseURL:
     envValue("VITE_FIREBASE_DATABASE_URL") ||
