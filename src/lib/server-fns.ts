@@ -112,7 +112,7 @@ async function authenticateUser(
   // 1. PRIMEIRO: verificar contra credenciais admin do .env
   //    Isto garante que o admin consegue SEMPRE entrar
   const adminEmail = (process.env.ADMIN_EMAIL || "admin@prudencio.pt").toLowerCase().trim();
-  const adminPassword = process.env.ADMIN_PASSWORD || "Rpavg5n";
+  const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
   const adminName = process.env.ADMIN_NAME || "Administrador";
 
   if (email.toLowerCase().trim() === adminEmail && password === adminPassword) {
