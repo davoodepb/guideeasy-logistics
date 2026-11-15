@@ -1,3 +1,4 @@
+import type { ErrorComponentProps } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
@@ -32,7 +33,7 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+function ErrorComponent({ error, reset }: ErrorComponentProps) {
   console.error("Critical Runtime Error:", error);
   const router = useRouter();
 
@@ -78,7 +79,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         </div>
 
         <div className="bg-red-50 text-red-800 p-3 rounded-xl text-xs font-mono text-left overflow-hidden text-ellipsis whitespace-nowrap">
-          {error.message || "Erro desconhecido"}
+          {(error as Error)?.message || "Erro desconhecido"}
         </div>
 
         <div className="flex flex-col gap-3 pt-2">
