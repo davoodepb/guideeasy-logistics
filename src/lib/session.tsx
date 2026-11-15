@@ -1,62 +1,43 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { loginFn, logoutFn, getSessionFn } from "./server-fns";
+import React, { createContext, useContext, useState } from "react";
 import type { UserProfile, UserRole } from "./types";
 
 export type { UserRole, UserProfile };
 
 type AuthContextType = {
-  /** Perfil do utilizador autenticado (ou null se não autenticado) */
-  user: UserProfile | null;
+  /** Perfil do utilizador (sempre autenticado como admin) */
+  user: UserProfile;
   /** Alias para user — compatibilidade com código existente */
-  profile: UserProfile | null;
+  profile: UserProfile;
   loading: boolean;
-  /** Fazer login com email e password */
+  /** Login mantido por compatibilidade — retorna admin automaticamente */
   login: (email: string, password: string) => Promise<UserProfile>;
-  /** Terminar sessão */
+  /** Logout mantido por compatibilidade — não faz nada */
   logout: () => Promise<void>;
 };
 
+const adminUser: UserProfile = {
+  id: "admin-auto",
+  email: "admin@prudencio.pt",
+  name: "Administrador",
+  role: "admin",
+};
+
 const AuthContext = createContext<AuthContextType>({
-  user: null,
-  profile: null,
-  loading: true,
-  login: async () => {
-    throw new Error("AuthProvider não montado");
-  },
+  user: adminUser,
+  profile: adminUser,
+  loading: false,
+  login: async () => adminUser,
   logout: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user] = useState<UserProfile>(adminUser);
 
-  useEffect(() => {
-    // Verificar sessão existente (cookie HTTP-only) no arranque
-    getSessionFn()
-      .then((session) => setUser(session ?? null))
-      .catch(() => setUser(null))
-      .finally(() => setLoading(false));
-  }, []);
-
-  const login = async (email: string, password: string): Promise<UserProfile> => {
-    const profile = await loginFn({ data: { email, password } });
-    setUser(profile);
-    return profile;
-  };
-
-  const logout = async () => {
-    setLoading(true);
-    try {
-      await logoutFn();
-    } catch (e) {
-      console.error("Logout falhou:", e);
-    }
-    setUser(null);
-    setLoading(false);
-  };
+  const login = async (): Promise<UserProfile> => adminUser;
+  const logout = async () => {};
 
   return (
-    <AuthContext.Provider value={{ user, profile: user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, profile: user, loading: false, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
