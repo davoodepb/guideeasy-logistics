@@ -79,7 +79,7 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
         </div>
 
         <div className="bg-red-50 text-red-800 p-3 rounded-xl text-xs font-mono text-left overflow-hidden text-ellipsis whitespace-nowrap">
-          {error.message || "Erro desconhecido"}
+          {(error as Error)?.message || "Erro desconhecido"}
         </div>
 
         <div className="flex flex-col gap-3 pt-2">
