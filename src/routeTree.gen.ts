@@ -9,34 +9,19 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as UploadRouteImport } from './routes/upload'
-import { Route as ObrasRouteImport } from './routes/obras'
-import { Route as HistoricoRouteImport } from './routes/historico'
-import { Route as FirebaseTestRouteImport } from './routes/firebase-test'
-import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ObraIdRouteImport } from './routes/obra.$id'
-import { Route as CompletedIdRouteImport } from './routes/completed.$id'
+import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as FirebaseTestRouteImport } from './routes/firebase-test'
+import { Route as HistoricoRouteImport } from './routes/historico'
+import { Route as ObrasRouteImport } from './routes/obras'
+import { Route as UploadRouteImport } from './routes/upload'
 import { Route as ChecklistIdRouteImport } from './routes/checklist.$id'
+import { Route as CompletedIdRouteImport } from './routes/completed.$id'
+import { Route as ObraIdRouteImport } from './routes/obra.$id'
 
-const UploadRoute = UploadRouteImport.update({
-  id: '/upload',
-  path: '/upload',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ObrasRoute = ObrasRouteImport.update({
-  id: '/obras',
-  path: '/obras',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const HistoricoRoute = HistoricoRouteImport.update({
-  id: '/historico',
-  path: '/historico',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FirebaseTestRoute = FirebaseTestRouteImport.update({
-  id: '/firebase-test',
-  path: '/firebase-test',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -44,14 +29,29 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const FirebaseTestRoute = FirebaseTestRouteImport.update({
+  id: '/firebase-test',
+  path: '/firebase-test',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ObraIdRoute = ObraIdRouteImport.update({
-  id: '/obra/$id',
-  path: '/obra/$id',
+const HistoricoRoute = HistoricoRouteImport.update({
+  id: '/historico',
+  path: '/historico',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ObrasRoute = ObrasRouteImport.update({
+  id: '/obras',
+  path: '/obras',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UploadRoute = UploadRouteImport.update({
+  id: '/upload',
+  path: '/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChecklistIdRoute = ChecklistIdRouteImport.update({
+  id: '/checklist/$id',
+  path: '/checklist/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CompletedIdRoute = CompletedIdRouteImport.update({
@@ -59,9 +59,9 @@ const CompletedIdRoute = CompletedIdRouteImport.update({
   path: '/completed/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ChecklistIdRoute = ChecklistIdRouteImport.update({
-  id: '/checklist/$id',
-  path: '/checklist/$id',
+const ObraIdRoute = ObraIdRouteImport.update({
+  id: '/obra/$id',
+  path: '/obra/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -149,32 +149,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/upload': {
-      id: '/upload'
-      path: '/upload'
-      fullPath: '/upload'
-      preLoaderRoute: typeof UploadRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/obras': {
-      id: '/obras'
-      path: '/obras'
-      fullPath: '/obras'
-      preLoaderRoute: typeof ObrasRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/historico': {
-      id: '/historico'
-      path: '/historico'
-      fullPath: '/historico'
-      preLoaderRoute: typeof HistoricoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/firebase-test': {
-      id: '/firebase-test'
-      path: '/firebase-test'
-      fullPath: '/firebase-test'
-      preLoaderRoute: typeof FirebaseTestRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -184,18 +163,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/firebase-test': {
+      id: '/firebase-test'
+      path: '/firebase-test'
+      fullPath: '/firebase-test'
+      preLoaderRoute: typeof FirebaseTestRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/obra/$id': {
-      id: '/obra/$id'
-      path: '/obra/$id'
-      fullPath: '/obra/$id'
-      preLoaderRoute: typeof ObraIdRouteImport
+    '/historico': {
+      id: '/historico'
+      path: '/historico'
+      fullPath: '/historico'
+      preLoaderRoute: typeof HistoricoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/obras': {
+      id: '/obras'
+      path: '/obras'
+      fullPath: '/obras'
+      preLoaderRoute: typeof ObrasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/upload': {
+      id: '/upload'
+      path: '/upload'
+      fullPath: '/upload'
+      preLoaderRoute: typeof UploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/checklist/$id': {
+      id: '/checklist/$id'
+      path: '/checklist/$id'
+      fullPath: '/checklist/$id'
+      preLoaderRoute: typeof ChecklistIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/completed/$id': {
@@ -205,11 +205,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CompletedIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/checklist/$id': {
-      id: '/checklist/$id'
-      path: '/checklist/$id'
-      fullPath: '/checklist/$id'
-      preLoaderRoute: typeof ChecklistIdRouteImport
+    '/obra/$id': {
+      id: '/obra/$id'
+      path: '/obra/$id'
+      fullPath: '/obra/$id'
+      preLoaderRoute: typeof ObraIdRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
